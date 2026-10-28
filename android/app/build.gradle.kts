@@ -14,6 +14,8 @@ if (releasePropertiesFile.exists()) {
 
 android {
     namespace = "io.github.saimadhav10.coc_tracker"
+    // AGP 9 enables unit tests only for the configured tested build type.
+    testBuildType = "release"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
