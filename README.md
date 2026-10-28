@@ -73,6 +73,13 @@ keyPassword=YOUR_PRIVATE_PASSWORD
 
 Then run `flutter build apk --release`. Output: `build/app/outputs/flutter-apk/app-release.apk`. Without a local signing configuration the build is unsigned. Signing files and APK build outputs are ignored by Git. **Back up the keystore and its passwords privately**; losing them prevents compatible updates to an installed release. Never commit them.
 
+On Windows, if Kotlin reports incremental-cache errors when the project and pub cache are on different drives, retry without incremental compilation:
+
+```powershell
+cd android
+.\gradlew.bat assembleRelease "-Pkotlin.incremental=false" "-Pkotlin.compiler.execution.strategy=in-process"
+```
+
 ### Refresh the bundled data
 
 ```sh
