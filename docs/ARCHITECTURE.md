@@ -1,0 +1,17 @@
+# COCTracker v0.1
+
+Android-first Flutter application; no backend or sign-in. Profiles are isolated by normalized player tag. A newer import replaces a profile snapshot after confirmation, including any manual timers. Older imports require the same confirmation and an explicit warning.
+
+`lib/domain/village.dart` validates the game export, expands grouped `cnt` entries, assigns unique instance keys, and derives finish times from the export timestamp. Only Home Village sections are imported. Unknown IDs, crafting structure metadata, and helper flags are preserved. The initial parser treats `lvl` as the recorded current level and a timed upgrade as targeting `lvl + 1`. Unusual event, supercharge, or other timer semantics should be checked against the game; the app never automatically advances a level when a timer expires.
+
+`lib/services/tracker_store.dart` stores a versioned JSON document in device preferences, performs validated backup restores, and sends reminder metadata over a platform channel. Backups contain every profile, manual state, and user preferences. Android cloud backup is disabled. Corrupt local data enters recovery mode and is preserved for export.
+
+`lib/services/game_updates.dart` retrieves the public catalogue from this repository and articles from the official Supercell blog. Village data is never included in those requests. Cached catalogues fall back to bundled data if unreadable. New remote icons fall back to a generic icon if their asset isn't bundled. A catalogue refresh retrieves the maintained repository snapshot; it does not claim to fetch live game files. Source revision and generation date are recorded in the catalogue.
+
+`tool/update_catalogue.py` transforms upstream Home Village JSON into a compact table of entity IDs, base costs and durations, prerequisites, statistics, and Town Hall level caps. Hero Hall, Blacksmith, Pet House, and Laboratory requirements map through their building tables. Unknown TH requirements remain explicitly unmapped. Snapshot progress counts imported items at known level caps, not total village completion, construction cost, or remaining builder time.
+
+`lib/app.dart` provides Village, Upgrades/Library, News, and Settings. The app imports profiles, switches/renames/removes them, records and confirms individual upgrades, and exports/restores backups. Text controllers are retained until dialog closing transitions finish.
+
+Android `ReminderEngine` uses opt-in Usage Access to observe foreground launches of `com.supercell.clashofclans`. It cannot identify which village was played or detect play on another device. The inactivity clock starts when monitoring is enabled; a recorded later launch resets it. Inexact AlarmManager checks run at most hourly and also target the next known upgrade completion. Battery restrictions can delay them. Reminders after 24 hours repeat no more frequently than three hours, respect configured quiet hours, and open Clash only when tapped. Upgrade reminders request a fresh import and are deduplicated by profile/item/finish time. Reboot and app replacement restore scheduling. No overlays, forced launches, or exact-alarm permissions are used.
+
+Future scope: upgrade priorities, army/farming/war guides, resource planning, optional cross-device sync, and a dedicated event calendar. Current events and balance updates appear as official blog announcements.
