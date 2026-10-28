@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -756,7 +757,7 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
     for (final option in filtered) {
       final key = option.item.upgrading
           ? option.item.key
-          : '${option.item.data}:${option.item.level}:${option.lockReason}';
+          : '${option.item.data}:${option.item.level}:${option.lockReason}:${jsonEncode(p.costs(option.item, option.level ?? {}))}';
       grouped.putIfAbsent(key, () => []).add(option);
     }
     final eligible = all.where((e) => e.eligible).length;

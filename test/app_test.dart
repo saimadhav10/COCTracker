@@ -126,6 +126,21 @@ void main() {
     await tester.pumpAndSettle();
     expect(cannon.level, 20);
     expect(cannon.upgrading, false);
+    await tester.enterText(find.byType(TextField), "Builder's Hut");
+    await tester.pumpAndSettle();
+    // Different purchase slots must keep their own row and Gem price.
+    for (final price in ['250', '500', '1,000', '2,000']) {
+      await tester.scrollUntilVisible(
+        find.text(price),
+        200,
+        scrollable: find
+            .byWidgetPredicate(
+              (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
+            )
+            .first,
+      );
+      expect(find.text(price), findsOneWidget);
+    }
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });
