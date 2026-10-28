@@ -27,9 +27,11 @@ object ReminderEngine {
         val ops = c.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
         return ops.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), c.packageName) == AppOpsManager.MODE_ALLOWED
     }
-    fun notificationsAllowed(c: Context): Boolean =
-        (Build.VERSION.SDK_INT < 33 || c.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) &&
-        (c.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).areNotificationsEnabled()
+    fun notificationsAllowed(c: Context): Boolean {
+        val manager = c.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        return (Build.VERSION.SDK_INT < 33 || c.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) &&
+            manager.areNotificationsEnabled() && manager.getNotificationChannel(CHANNEL)?.importance != NotificationManager.IMPORTANCE_NONE
+    }
 
     fun configure(c: Context, args: Map<*, *>) {
         val p = prefs(c)
@@ -74,6 +76,8 @@ object ReminderEngine {
         start < end -> hour >= start && hour < end
         else -> hour >= start || hour < end
     }
+    fun inactivityDue(now: Long, seen: Long, lastReminder: Long): Boolean =
+        now - seen >= 24 * HOUR && now - lastReminder >= 3 * HOUR
     fun tick(c: Context) {
         val p = prefs(c)
         if (!p.getBoolean("enabled", false)) return
@@ -81,7 +85,7 @@ object ReminderEngine {
         val seen = lastSeen(c)
         val quiet = isQuiet(Calendar.getInstance().get(Calendar.HOUR_OF_DAY), p.getInt("quietStart", 22), p.getInt("quietEnd", 8))
         if (!quiet && notificationsAllowed(c)) {
-            if (hasUsageAccess(c) && now - seen >= 24 * HOUR && now - p.getLong("lastReminder", 0) >= 3 * HOUR) {
+            if (hasUsageAccess(c) && inactivityDue(now, seen, p.getLong("lastReminder", 0))) {
                 notify(c, 24, "Your village is waiting", "It’s been at least 24 hours since Clash was opened on this device.", true)
                 p.edit().putLong("lastReminder", now).apply()
             }
@@ -89,8 +93,9 @@ object ReminderEngine {
             val notified = (p.getStringSet("notified", emptySet()) ?: emptySet()).toMutableSet()
             val due = (0 until upgrades.length()).map { upgrades.getJSONObject(it) }
                 .filter { it.getLong("at") <= now && !notified.contains(it.getString("id")) }
-            due.groupBy { it.getString("village") }.forEach { (village, items) ->
-                notify(c, 1000 + (village.hashCode() and 0xffff), "$village · refresh your snapshot",
+            due.groupBy { it.optString("profile", it.getString("village")) }.forEach { (profile, items) ->
+                val village = items.first().getString("village")
+                notify(c, 1000 + (profile.hashCode() and 0xffff), "$village ($profile) · refresh your snapshot",
                     "${items.size} recorded upgrade timer(s) ended. Confirm in-game and import fresh JSON.", false)
                 items.forEach { notified.add(it.getString("id")) }
             }

@@ -58,7 +58,7 @@ flutter test
 flutter run
 ```
 
-GitHub Actions runs formatting, analysis, tests, and a debug APK build. The debug artifact is a CI preview with a different signing identity from the release APK; uninstall it before installing a signed release if signatures conflict. Export a backup before uninstalling.
+GitHub Actions runs formatting, analysis, Flutter tests, native reminder unit tests, and an unsigned release APK build. CI has no private signing key: its artifact must be signed locally before installation. Install the signed APK from GitHub Releases.
 
 ### Signed release builds
 
@@ -71,7 +71,7 @@ keyAlias=YOUR_KEY_ALIAS
 keyPassword=YOUR_PRIVATE_PASSWORD
 ```
 
-Then run `flutter build apk --release`. Output: `build/app/outputs/flutter-apk/app-release.apk`. Signing files and APK build outputs are ignored by Git. **Back up the keystore and its passwords privately**; losing them prevents compatible updates to an installed release. Never commit them.
+Then run `flutter build apk --release`. Output: `build/app/outputs/flutter-apk/app-release.apk`. Without a local signing configuration the build is unsigned. Signing files and APK build outputs are ignored by Git. **Back up the keystore and its passwords privately**; losing them prevents compatible updates to an installed release. Never commit them.
 
 ### Refresh the bundled data
 

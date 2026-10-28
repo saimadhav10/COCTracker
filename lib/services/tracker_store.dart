@@ -150,6 +150,7 @@ class TrackerStore extends ChangeNotifier {
                     '${v.tag}:${item.key}:${item.finishesAt!.millisecondsSinceEpoch}',
                 'at': item.finishesAt!.millisecondsSinceEpoch,
                 'village': v.name,
+                'profile': v.tag,
               },
         ],
       });
