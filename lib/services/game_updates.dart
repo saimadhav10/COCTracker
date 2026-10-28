@@ -12,7 +12,7 @@ const catalogueUrl =
 
 Catalogue decodeCatalogue(String text) {
   final j = jsonDecode(text) as Map<String, dynamic>;
-  if (j['schema'] != 1 ||
+  if (j['schema'] != 2 ||
       j['entries'] is! Map ||
       (j['entries'] as Map).length < 50) {
     throw const FormatException('Unrecognized catalogue format.');
@@ -45,7 +45,7 @@ Future<Catalogue> refreshCatalogue(SharedPreferences prefs) async {
     throw const FormatException('Catalogue is too large.');
   }
   final result = decodeCatalogue(response.body);
-  await prefs.setString('catalogue.v1', response.body);
+  await prefs.setString('catalogue.v2', response.body);
   return result;
 }
 

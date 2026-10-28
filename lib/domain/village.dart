@@ -20,6 +20,7 @@ class VillageItem {
     this.finishesAt,
     this.targetLevel,
     this.extra = const {},
+    this.startedAt,
   });
   final String key;
   final int data;
@@ -27,6 +28,7 @@ class VillageItem {
   int level;
   DateTime? finishesAt;
   int? targetLevel;
+  DateTime? startedAt;
   final Map<String, dynamic> extra;
   bool get upgrading => finishesAt != null;
   bool ready(DateTime now) => finishesAt != null && !finishesAt!.isAfter(now);
@@ -38,6 +40,7 @@ class VillageItem {
     'finishesAt': finishesAt?.toUtc().toIso8601String(),
     'targetLevel': targetLevel,
     'extra': extra,
+    'startedAt': startedAt?.toUtc().toIso8601String(),
   };
   factory VillageItem.fromJson(Map<String, dynamic> j) => VillageItem(
     key: j['key'] as String,
@@ -47,6 +50,7 @@ class VillageItem {
     finishesAt: DateTime.tryParse(j['finishesAt'] ?? ''),
     targetLevel: j['targetLevel'] as int?,
     extra: Map<String, dynamic>.from(j['extra'] ?? {}),
+    startedAt: DateTime.tryParse(j['startedAt'] ?? ''),
   );
 }
 
@@ -57,12 +61,16 @@ class Village {
     required this.exportedAt,
     required this.importedAt,
     required this.items,
+    this.builderDiscount = 0,
+    this.researchDiscount = 0,
   });
   final String tag;
   String name;
   final DateTime exportedAt;
   final DateTime importedAt;
   final List<VillageItem> items;
+  int builderDiscount;
+  int researchDiscount;
   int get townHall =>
       items.where((e) => e.data == 1000001).firstOrNull?.level ?? 1;
   List<VillageItem> get active =>
@@ -77,12 +85,16 @@ class Village {
     'exportedAt': exportedAt.toUtc().toIso8601String(),
     'importedAt': importedAt.toUtc().toIso8601String(),
     'items': items.map((e) => e.toJson()).toList(),
+    'builderDiscount': builderDiscount,
+    'researchDiscount': researchDiscount,
   };
   factory Village.fromJson(Map<String, dynamic> j) => Village(
     tag: j['tag'] as String,
     name: j['name'] as String,
     exportedAt: DateTime.parse(j['exportedAt']),
     importedAt: DateTime.parse(j['importedAt']),
+    builderDiscount: j['builderDiscount'] as int? ?? 0,
+    researchDiscount: j['researchDiscount'] as int? ?? 0,
     items: (j['items'] as List)
         .map((e) => VillageItem.fromJson(Map<String, dynamic>.from(e)))
         .toList(),
@@ -190,7 +202,8 @@ String durationLabel(Duration value) {
   if (value.isNegative || value.inSeconds == 0) return 'Ready to confirm';
   if (value.inDays > 0) return '${value.inDays}d ${value.inHours % 24}h';
   if (value.inHours > 0) return '${value.inHours}h ${value.inMinutes % 60}m';
-  return '${value.inMinutes + 1}m';
+  if (value.inMinutes == 0) return '${value.inSeconds}s';
+  return '${value.inMinutes}m${value.inSeconds % 60 == 0 ? '' : ' ${value.inSeconds % 60}s'}';
 }
 
 class Catalogue {

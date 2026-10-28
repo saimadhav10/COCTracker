@@ -1,4 +1,4 @@
-# COCTracker v0.1
+# COCTracker v2.0
 
 Android-first Flutter application; no backend or sign-in. Profiles are isolated by normalized player tag. A newer import replaces a profile snapshot after confirmation, including any manual timers. Older imports require the same confirmation and an explicit warning.
 
@@ -10,8 +10,12 @@ Android-first Flutter application; no backend or sign-in. Profiles are isolated 
 
 `tool/update_catalogue.py` transforms upstream Home Village JSON into a compact table of entity IDs, base costs and durations, prerequisites, statistics, and Town Hall level caps. Hero Hall, Blacksmith, Pet House, and Laboratory requirements map through their building tables. Unknown TH requirements remain explicitly unmapped. Snapshot progress counts imported items at known level caps, not total village completion, construction cost, or remaining builder time.
 
-`lib/app.dart` provides Village, Upgrades/Library, News, and Settings. The app imports profiles, switches/renames/removes them, records and confirms individual upgrades, and exports/restores backups. Text controllers are retained until dialog closing transitions finish.
+`lib/domain/upgrades.dart` derives missing building slots, next-level eligibility, completed prerequisites, storage capacity and per-currency remaining costs. Schema 2 catalogue caches exclude supercharge duplicate rows and preserve per-instance building placement prices. Merge tracking retains consumed source entries inside the active item's metadata so cancellation survives backup/restart. Existing schema 1 profile backups remain compatible.
+
+`lib/domain/armies.dart` calculates suggested rosters from owned troop levels and known camp capacity. No outcome statistics or trained-army state are fabricated. Guidance is app-authored; imported player state and catalogue facts remain separate.
+
+`lib/app.dart` provides Home, Upgrades, Armies, Profiles and Settings. Build/Upgrade/Complete/Cancel controls act inline. A one-second notifier updates countdowns from absolute timestamps; only a confirmation or fresh import changes an expired level. Gold Pass preferences affect new estimates, never imported timers. Three dark themes use Space Grotesk and Plus Jakarta Sans. Settings includes the creator's GitHub link.
 
 Android `ReminderEngine` uses opt-in Usage Access to observe foreground launches of `com.supercell.clashofclans`. It cannot identify which village was played or detect play on another device. The inactivity clock starts when monitoring is enabled; a recorded later launch resets it. Inexact AlarmManager checks run at most hourly and also target the next known upgrade completion. Battery restrictions can delay them. Reminders after 24 hours repeat no more frequently than three hours, respect configured quiet hours, and open Clash only when tapped. Upgrade reminders request a fresh import and are deduplicated by profile/item/finish time. Reboot and app replacement restore scheduling. No overlays, forced launches, or exact-alarm permissions are used.
 
-Future scope: upgrade priorities, army/farming/war guides, resource planning, optional cross-device sync, and a dedicated event calendar. Current events and balance updates appear as official blog announcements.
+Current events and balance updates appear as official blog announcements. Profiles remain local with file/clipboard backup; there is no sign-in or cross-device service. APKs split by ABI and bounded WebP assets reduce download size. Supercharge and nested crafting requirements are preserved on import but do not receive guessed manual progression.

@@ -25,10 +25,10 @@ jobs:
       - run: dart format --output=none --set-exit-if-changed lib test
       - run: flutter analyze
       - run: flutter test
-      - run: flutter build apk --release
+      - run: flutter build apk --release --split-per-abi
       - run: ./gradlew :app:testReleaseUnitTest
         working-directory: android
       - uses: actions/upload-artifact@v4
         with:
-          name: coc-tracker-unsigned-release
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: coc-tracker-unsigned-split-release
+          path: build/app/outputs/flutter-apk/app-*-release.apk

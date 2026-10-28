@@ -25,11 +25,20 @@ Future<TrackerStore> makeStore({bool populated = true}) async {
           'buildings': [
             {'data': 1000001, 'lvl': 14},
             {'data': 1000008, 'lvl': 19, 'cnt': 6},
+            {'data': 1000003, 'lvl': 15, 'cnt': 4},
+            {'data': 1000005, 'lvl': 15, 'cnt': 4},
+            {'data': 1000000, 'lvl': 11, 'cnt': 4},
             {'data': 1000014, 'lvl': 9, 'timer': 90000},
             {'data': 1000027, 'lvl': 7, 'timer': 190000},
           ],
           'heroes': [
             {'data': 28000001, 'lvl': 75},
+          ],
+          'units': [
+            {'data': 4000000, 'lvl': 9},
+            {'data': 4000001, 'lvl': 9},
+            {'data': 4000003, 'lvl': 10},
+            {'data': 4000008, 'lvl': 9},
           ],
           'spells': [
             {'data': 26000009, 'lvl': 6, 'timer': 133120},
@@ -91,7 +100,7 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
-  testWidgets('upgrade detail can manually start, then confirm an upgrade', (
+  testWidgets('inline actions start and complete without opening details', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(430, 932);
@@ -107,26 +116,13 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'Cannon');
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.widgetWithText(ListTile, 'Cannon').first);
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(ListTile, 'Cannon').first);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Record upgrade'));
-    await tester.pumpAndSettle();
-    final fields = find.byType(TextField);
-    await tester.enterText(fields.at(1), '1');
-    await tester.enterText(fields.at(2), '0');
-    await tester.tap(find.text('Start timer'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Upgrade').first);
     await tester.pumpAndSettle();
     final cannon = store.selected!.items.firstWhere(
       (e) => e.data == 1000008 && e.upgrading,
     );
     expect(cannon.targetLevel, 20);
-    await tester.tap(find.widgetWithText(ListTile, 'Cannon').first);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Confirm complete'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Continue'));
+    await tester.tap(find.text('Complete').first);
     await tester.pumpAndSettle();
     expect(cannon.level, 20);
     expect(cannon.upgrading, false);
@@ -134,7 +130,7 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
-  testWidgets('phone layouts render in both themes and produce previews', (
+  testWidgets('phone layouts render in all themes and produce previews', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(430, 932);
@@ -144,10 +140,18 @@ void main() {
     final store = await makeStore();
     final data = await catalogue();
     await tester.runAsync(() async {
-      await (FontLoader('Manrope')..addFont(
+      await (FontLoader('SpaceGrotesk')..addFont(
             Future.value(
               ByteData.sublistView(
-                File('assets/fonts/Manrope.ttf').readAsBytesSync(),
+                File('assets/fonts/SpaceGrotesk.ttf').readAsBytesSync(),
+              ),
+            ),
+          ))
+          .load();
+      await (FontLoader('PlusJakartaSans')..addFont(
+            Future.value(
+              ByteData.sublistView(
+                File('assets/fonts/PlusJakartaSans.ttf').readAsBytesSync(),
               ),
             ),
           ))
@@ -164,7 +168,27 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    for (final theme in ['light', 'dark']) {
+    await tester.runAsync(() async {
+      for (final entry in data.entries.values) {
+        final asset = entry['image'];
+        if (asset is String) {
+          await precacheImage(AssetImage(asset), boundary.currentContext!);
+        }
+      }
+      for (final asset in [
+        'resource_gold',
+        'resource_elixir',
+        'resource_dark_elixir',
+        'resource_gems',
+      ]) {
+        await precacheImage(
+          AssetImage('assets/icons/$asset.webp'),
+          boundary.currentContext!,
+        );
+      }
+    });
+    await tester.pumpAndSettle();
+    for (final theme in ['citadel', 'onyx', 'purple']) {
       store.theme = theme;
       await store.save();
       await tester.pumpAndSettle();
@@ -180,10 +204,45 @@ void main() {
         image.dispose();
       });
     }
-    await tester.tap(find.text('Settings').last);
+    store.theme = 'citadel';
+    await store.save();
+    for (final page in ['Upgrades', 'Armies', 'Profiles', 'Settings']) {
+      await tester.tap(find.text(page).last);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      final render =
+          boundary.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+      await tester.runAsync(() async {
+        final image = await render.toImage();
+        final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+        await File(
+          'docs/screenshots/${page.toLowerCase()}.png',
+        ).writeAsBytes(bytes!.buffer.asUint8List());
+        image.dispose();
+      });
+    }
     await tester.pumpAndSettle();
-    expect(find.text('Village preferences.'), findsOneWidget);
+    expect(find.text('Settings & local data'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('ABOUT THE CREATOR'), 500);
+    expect(find.text('@saimadhav10'), findsOneWidget);
+    await tester.pumpAndSettle();
+    final creatorRender =
+        boundary.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+    await tester.runAsync(() async {
+      final image = await creatorRender.toImage();
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+      await File(
+        'docs/screenshots/creator.png',
+      ).writeAsBytes(bytes!.buffer.asUint8List());
+      image.dispose();
+    });
     expect(tester.takeException(), isNull);
+    tester.view.physicalSize = const Size(360, 800);
+    for (final page in ['Home', 'Upgrades', 'Armies', 'Profiles', 'Settings']) {
+      await tester.tap(find.text(page).last);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    }
     await tester.pumpWidget(const SizedBox());
   });
 }

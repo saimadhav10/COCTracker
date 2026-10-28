@@ -134,13 +134,13 @@ void main() {
         ),
       );
       store.villages.first.items.first.level = 15;
-      store.theme = 'dark';
+      store.theme = 'purple';
       await store.save();
       final fresh = TrackerStore(prefs)..load();
       expect(fresh.villages.length, 2);
       expect(fresh.selected?.name, 'Mini');
       expect(fresh.villages.first.townHall, 15);
-      expect(fresh.theme, 'dark');
+      expect(fresh.theme, 'purple');
       await fresh.restore(store.backup());
       expect(
         fresh.villages.first.active.first.finishesAt,

@@ -1,0 +1,44 @@
+[
+  {
+    "name": "Icon_HV_Resource_Gem",
+    "asset": "assets/icons/resource_gems.webp",
+    "source": "https://fankit.supercell.com/d/vkEdmkUCngKw/game-assets",
+    "imageUrl": "https://media.ffycdn.net/eu/supercell/u7pauwgAjgRLZUNKg3jT.png?width=800"
+  },
+  {
+    "name": "Icon_HV_Resource_Gold_1",
+    "asset": "assets/icons/resource_gold.webp",
+    "source": "https://fankit.supercell.com/d/vkEdmkUCngKw/game-assets",
+    "imageUrl": "https://media.ffycdn.net/eu/supercell/9YH5NnM3Ycxvi2wThWCt.png?width=800"
+  },
+  {
+    "name": "Icon_HV_Resource_Elixir_1",
+    "asset": "assets/icons/resource_elixir.webp",
+    "source": "https://fankit.supercell.com/d/vkEdmkUCngKw/game-assets",
+    "imageUrl": "https://media.ffycdn.net/eu/supercell/BV54prjNWJCcjemWQH4G.png?width=800"
+  },
+  {
+    "name": "Icon_HV_Resource_Dark_Elixir_1",
+    "asset": "assets/icons/resource_dark_elixir.webp",
+    "source": "https://fankit.supercell.com/d/vkEdmkUCngKw/game-assets",
+    "imageUrl": "https://media.ffycdn.net/eu/supercell/n6j4KEJdcJqJurrkvrtU.png?width=800"
+  },
+  {
+    "name": "Icon_HV_Resource_Shiny_Ore",
+    "asset": "assets/icons/resource_shiny_ore.webp",
+    "source": "https://fankit.supercell.com/d/vkEdmkUCngKw/game-assets",
+    "imageUrl": "https://media.ffycdn.net/eu/supercell/vcy22P2s3SfB91tUm6HV.png?width=800"
+  },
+  {
+    "name": "Icon_HV_Resource_Glowy_Ore",
+    "asset": "assets/icons/resource_glowing_ore.webp",
+    "source": "https://fankit.supercell.com/d/vkEdmkUCngKw/game-assets",
+    "imageUrl": "https://media.ffycdn.net/eu/supercell/54BRhBgyLWvGDsg2UCsj.png?width=800"
+  },
+  {
+    "name": "Icon_HV_Resource_Starry_Ore",
+    "asset": "assets/icons/resource_starry_ore.webp",
+    "source": "https://fankit.supercell.com/d/vkEdmkUCngKw/game-assets",
+    "imageUrl": "https://media.ffycdn.net/eu/supercell/zaS6mtw1tiftumPVcgPY.png?width=800"
+  }
+]

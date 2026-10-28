@@ -15,7 +15,7 @@ Future<void> main() async {
     final bundled = await rootBundle.loadString('assets/catalogue/home.json');
     var catalogue = decodeCatalogue(bundled);
     try {
-      final cached = prefs.getString('catalogue.v1');
+      final cached = prefs.getString('catalogue.v2');
       if (cached != null) catalogue = decodeCatalogue(cached);
     } catch (_) {
       /* Retain bundled catalogue when a cached update is unreadable. */
@@ -27,8 +27,13 @@ Future<void> main() async {
     });
     LicenseRegistry.addLicense(() async* {
       yield LicenseEntryWithLineBreaks([
-        'Manrope',
-      ], await rootBundle.loadString('assets/fonts/OFL.txt'));
+        'Space Grotesk',
+      ], await rootBundle.loadString('assets/fonts/SpaceGrotesk-OFL.txt'));
+    });
+    LicenseRegistry.addLicense(() async* {
+      yield LicenseEntryWithLineBreaks([
+        'Plus Jakarta Sans',
+      ], await rootBundle.loadString('assets/fonts/PlusJakartaSans-OFL.txt'));
     });
     runApp(TrackerApp(store: store, catalogue: catalogue));
   } catch (_) {

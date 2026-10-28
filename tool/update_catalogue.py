@@ -8,6 +8,7 @@ import pathlib
 import shutil
 import subprocess
 import sys
+from PIL import Image
 from datetime import datetime, timezone
 
 root = pathlib.Path(__file__).resolve().parents[1]
@@ -38,6 +39,8 @@ for row in rows:
         continue
     levels = []
     for level in row.get('levels', []):
+        if level.get('supercharge'):
+            continue
         number = level.get('level')
         if not isinstance(number, int):
             continue
@@ -52,10 +55,13 @@ for row in rows:
         cost = level.get('buildCost', level.get('researchCost', level.get('upgradeCost')))
         resource = level.get('buildCostResource', level.get('researchCostResource', level.get('upgradeCostResource')))
         ores = {ore: level[key] for ore, key in [('Shiny ore', 'upgradeShinyOre'), ('Glowing ore', 'upgradeGlowingOre'), ('Starry ore', 'upgradeStarryOre')] if level.get(key)}
+        duration = seconds(level.get('buildTime', level.get('researchTime', level.get('upgradeTime'))))
+        if row.get('category') == 'hero-equipment':
+            duration = 0
         levels.append({'level': number, 'townHall': th or 999, 'cost': cost, 'resource': resource,
-                       'seconds': seconds(level.get('buildTime', level.get('researchTime', level.get('upgradeTime')))),
+                       'seconds': duration,
                        'ores': ores, 'requirements': {k: v for k, v in level.items() if 'Required' in k},
-                       'stats': {k: v for k, v in level.items() if k in ['hitpoints', 'damagePerSecond', 'stats', 'storageCapacity']}})
+                       'stats': {k: v for k, v in level.items() if k in ['hitpoints', 'damagePerSecond', 'stats', 'storageCapacity', 'troopCapacity', 'spellCapacity', 'armyCapacity', 'capacity', 'housingSpace', 'spellStorageCapacity']}})
     top_images = row.get('images', {})
     icon = top_images.get('icon') if isinstance(top_images, dict) else None
     if not icon:
@@ -68,19 +74,29 @@ for row in rows:
                 break
     icon_path = None
     if isinstance(icon, str) and (upstream / icon).is_file():
-        target = images / f'{data}{pathlib.Path(icon).suffix}'
-        shutil.copyfile(upstream / icon, target)
+        target = images / f'{data}.webp'
+        with Image.open(upstream / icon) as im:
+            im = im.convert('RGBA')
+            im.thumbnail((192, 192), Image.Resampling.LANCZOS)
+            im.save(target, 'WEBP', quality=82, method=6)
         icon_path = target.relative_to(root).as_posix()
     entries[str(data)] = {'name': row['name'], 'slug': row['id'], 'category': row.get('category'),
-                          'description': row.get('description', ''), 'image': icon_path, 'levels': levels}
+                          'description': row.get('description', ''), 'image': icon_path, 'levels': levels,
+                          'counts': row.get('availablePerTownHall', []),
+                          'placementCosts': row.get('placementCosts', []),
+                          'housing': row.get('housingSpace'), 'superTroop': row.get('superTroop', False),
+                          'unlock': {k: v for k, v in row.items() if k in ['barrackLevelRequired', 'petHouseLevelRequired', 'spellFactoryLevelRequired', 'workshopLevelRequired', 'townHallRequired', 'unlockRequirement', 'troopType', 'spellType']}}
     if row['id'] == 'town-hall':
         for level in row.get('levels', []):
             path = level.get('images', {}).get('normal')
             if path and (upstream / path).is_file():
-                shutil.copyfile(upstream / path, images / f'townhall_{level["level"]}.png')
+                with Image.open(upstream / path) as im:
+                    im = im.convert('RGBA')
+                    im.thumbnail((256, 256), Image.Resampling.LANCZOS)
+                    im.save(images / f'townhall_{level["level"]}.webp', 'WEBP', quality=85, method=6)
 
 commit = subprocess.check_output(['git', '-C', str(upstream), 'rev-parse', 'HEAD'], text=True).strip()
-catalogue = {'schema': 1, 'updatedAt': datetime.now(timezone.utc).isoformat(),
+catalogue = {'schema': 2, 'updatedAt': datetime.now(timezone.utc).isoformat(),
              'source': 'https://github.com/chiefpansancolt/clash-of-clans-data',
              'revision': commit, 'entries': entries}
 (output / 'home.json').write_text(json.dumps(catalogue, separators=(',', ':')), encoding='utf-8')
