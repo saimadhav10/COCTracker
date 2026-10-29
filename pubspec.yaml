@@ -1,7 +1,7 @@
 name: coc_tracker
 description: An offline-first Home Village companion for Clash of Clans.
 publish_to: none
-version: 2.0.0+2
+version: 3.0.0+3
 
 environment:
   sdk: '>=3.10.0 <4.0.0'
@@ -24,6 +24,7 @@ flutter:
   assets:
     - assets/catalogue/
     - assets/icons/
+    - assets/branding/app-icon.webp
     - assets/fonts/SpaceGrotesk-OFL.txt
     - assets/fonts/PlusJakartaSans-OFL.txt
   fonts:

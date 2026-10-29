@@ -137,7 +137,7 @@ class CitadelPanel extends StatelessWidget {
       color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(16),
       border: Border.all(
-        color: color?.withValues(alpha: .65) ?? const Color(0xff36405a),
+        color: color?.withValues(alpha: .24) ?? const Color(0xff30384b),
       ),
       boxShadow: [
         BoxShadow(

@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:coc_tracker/domain/armies.dart';
 import 'package:coc_tracker/domain/upgrades.dart';
 import 'package:coc_tracker/domain/village.dart';
 import 'package:coc_tracker/services/game_updates.dart';
@@ -67,6 +66,17 @@ void main() {
     expect(v.items.length, before);
     expect(p.inventory.map((e) => e.key).toSet().length, p.inventory.length);
   });
+  test(
+    'recommendations prioritize offense prerequisites and exclude locked/maxed items',
+    () {
+      final p = UpgradePlanner(village(), catalogue);
+      final next = p.recommendations;
+      expect(catalogue.entry(next.first.item.data)?['slug'], 'laboratory');
+      expect(next.every((c) => c.eligible && !c.item.upgrading), true);
+      expect(next.map((c) => c.item.data).toSet().length, next.length);
+      expect(next.length, lessThanOrEqualTo(8));
+    },
+  );
   test('storage capacity is checked using completed levels', () {
     final v = village();
     final p = UpgradePlanner(v, catalogue);
@@ -216,32 +226,6 @@ void main() {
     await store.save();
     expect(v.items.last.finishesAt, DateTime.utc(2027));
   });
-  test(
-    'army plans respect actual imported camp capacity and owned troop levels',
-    () {
-      final v = village();
-      v.items.addAll([
-        VillageItem(key: 'barb', data: 4000000, section: 'units', level: 9),
-        VillageItem(key: 'archer', data: 4000001, section: 'units', level: 9),
-        VillageItem(key: 'giant', data: 4000003, section: 'units', level: 10),
-      ]);
-      final capacity = campCapacity(v, catalogue);
-      expect(capacity, greaterThan(0));
-      for (final plan in armyPlans(v, catalogue)) {
-        final used = plan.roster.entries.fold<int>(
-          0,
-          (n, e) =>
-              n +
-              ((catalogue.entry(e.key)!['housing'] as num) * e.value).toInt(),
-        );
-        expect(used, lessThanOrEqualTo(capacity));
-        expect(
-          plan.roster.keys.every((id) => v.items.any((i) => i.data == id)),
-          true,
-        );
-      }
-    },
-  );
   test('legacy backup themes migrate without losing player data', () async {
     final v = village();
     final raw = jsonEncode({

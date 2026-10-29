@@ -381,6 +381,36 @@ class UpgradePlanner {
     if (catalogue.entry(item.data)?['category'] == 'wall') return 4;
     return 3;
   }
+
+  /// App planning order, rather than an official game or performance ranking.
+  List<UpgradeChoice> get recommendations {
+    const offenseOrder = [
+      'laboratory',
+      'army-camp',
+      'clan-castle',
+      'hero-hall',
+      'blacksmith',
+      'barracks',
+      'dark-barracks',
+      'spell-factory',
+      'dark-spell-factory',
+      'pet-house',
+    ];
+    int rank(VillageItem item) {
+      final index = offenseOrder.indexOf(catalogue.entry(item.data)?['slug']);
+      return priority(item) * 100 + (index < 0 ? 50 : index);
+    }
+
+    final eligible = choices.where((c) => c.eligible).toList()
+      ..sort((a, b) {
+        final order = rank(a.item).compareTo(rank(b.item));
+        return order != 0
+            ? order
+            : catalogue.name(a.item).compareTo(catalogue.name(b.item));
+      });
+    final seen = <int>{};
+    return eligible.where((c) => seen.add(c.item.data)).take(8).toList();
+  }
 }
 
 String liveCountdown(Duration d) {

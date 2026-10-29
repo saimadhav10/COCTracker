@@ -1,11 +1,11 @@
 {
-    "name": "coc_tracker",
-    "short_name": "coc_tracker",
+    "name": "COCTracker",
+    "short_name": "COCTracker",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0b111e",
+    "theme_color": "#181e2c",
+    "description": "A local Home Village upgrade tracker for Clash of Clans.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

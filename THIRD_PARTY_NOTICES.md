@@ -9,3 +9,7 @@ Gold, Elixir, Dark Elixir, Gems and ore icons come from the official [Supercell 
 Space Grotesk and Plus Jakarta Sans fonts use the SIL Open Font License 1.1. Full copyright and license notices are included in `assets/fonts/SpaceGrotesk-OFL.txt` and `assets/fonts/PlusJakartaSans-OFL.txt`.
 
 Flutter, Material Icons, and package dependency licenses are accessible in the application's About → Licenses screen.
+
+Army composition facts (troop/spell counts and explicitly listed heroes) were checked against public [Clash Armies](https://clasharmies.com/) cards on 29 October 2026. Each composition includes its individual source URL in-app. Source descriptions, voting/download statistics, artwork, and performance claims are not copied. Source attack-type labels are retained; missing slots are not generated. The factual transcription audit and excluded entries are recorded in `docs/army-source-audit.json`.
+
+The COCTracker castle/clock emblem is original project artwork generated with the built-in ImageGen tool. Prompt and asset provenance: `docs/BRANDING.md`.

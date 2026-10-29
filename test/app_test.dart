@@ -77,9 +77,9 @@ void main() {
       TrackerApp(store: store, catalogue: await catalogue()),
     );
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Import your first village'));
+    await tester.ensureVisible(find.byTooltip('Import your first village'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Import your first village'));
+    await tester.tap(find.byTooltip('Import your first village'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).first, 'My main');
     await tester.enterText(
@@ -92,7 +92,7 @@ void main() {
         ],
       }),
     );
-    await tester.tap(find.text('Import').last);
+    await tester.tap(find.byTooltip('Import').last);
     await tester.pumpAndSettle();
     expect(store.villages.single.name, 'My main');
     expect(find.text('My main'), findsOneWidget);
@@ -112,17 +112,17 @@ void main() {
       TrackerApp(store: store, catalogue: await catalogue()),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Upgrades').last);
+    await tester.tap(find.byTooltip('Upgrades').last);
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'Cannon');
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Upgrade').first);
+    await tester.tap(find.byTooltip('Upgrade Cannon').first);
     await tester.pumpAndSettle();
     final cannon = store.selected!.items.firstWhere(
       (e) => e.data == 1000008 && e.upgrading,
     );
     expect(cannon.targetLevel, 20);
-    await tester.tap(find.text('Complete').first);
+    await tester.tap(find.byTooltip('Complete Cannon').first);
     await tester.pumpAndSettle();
     expect(cannon.level, 20);
     expect(cannon.upgrading, false);
@@ -190,6 +190,17 @@ void main() {
           await precacheImage(AssetImage(asset), boundary.currentContext!);
         }
       }
+      final armyArt =
+          jsonDecode(
+                File('assets/catalogue/army_units.json').readAsStringSync(),
+              )
+              as Map;
+      for (final unit in armyArt.values) {
+        await precacheImage(
+          AssetImage(unit['image'] as String),
+          boundary.currentContext!,
+        );
+      }
       for (final asset in [
         'resource_gold',
         'resource_elixir',
@@ -221,8 +232,17 @@ void main() {
     }
     store.theme = 'citadel';
     await store.save();
-    for (final page in ['Upgrades', 'Armies', 'Profiles', 'Settings']) {
-      await tester.tap(find.text(page).last);
+    expect(find.textContaining('mapped level steps'), findsNothing);
+    expect(find.textContaining('Resources still needed'), findsNothing);
+    expect(find.byTooltip('Completion time'), findsWidgets);
+    for (final page in [
+      'Upgrades',
+      'Armies',
+      'Recommendations',
+      'Profiles',
+      'Settings',
+    ]) {
+      await tester.tap(find.byTooltip(page).last);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       final render =
@@ -237,7 +257,7 @@ void main() {
       });
     }
     await tester.pumpAndSettle();
-    expect(find.text('Settings & local data'), findsOneWidget);
+    expect(find.text('Settings'), findsWidgets);
     await tester.scrollUntilVisible(find.text('ABOUT THE CREATOR'), 500);
     expect(find.text('@saimadhav10'), findsOneWidget);
     await tester.pumpAndSettle();
@@ -253,8 +273,15 @@ void main() {
     });
     expect(tester.takeException(), isNull);
     tester.view.physicalSize = const Size(360, 800);
-    for (final page in ['Home', 'Upgrades', 'Armies', 'Profiles', 'Settings']) {
-      await tester.tap(find.text(page).last);
+    for (final page in [
+      'Home',
+      'Upgrades',
+      'Armies',
+      'Recommendations',
+      'Profiles',
+      'Settings',
+    ]) {
+      await tester.tap(find.byTooltip(page).last);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     }

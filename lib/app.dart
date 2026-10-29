@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'domain/village.dart';
 import 'domain/upgrades.dart';
-import 'domain/armies.dart';
+import 'domain/sourced_armies.dart';
 import 'services/game_updates.dart';
 import 'services/tracker_store.dart';
 import 'ui/citadel_theme.dart';
@@ -44,6 +44,7 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
   String query = '';
   String category = 'All';
   String sort = 'Priority';
+  late final armyCatalogue = loadSourcedArmies();
   String armyType = 'All';
   bool showLocked = false;
   bool showMaxed = false;
@@ -156,11 +157,12 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
                 children: [
                   Text(
                     [
-                      'COCTracker',
+                      v?.name ?? 'COCTracker',
                       'Upgradables',
-                      'Army Compositions',
-                      'Village Accounts',
-                      'Village Preferences',
+                      'Armies',
+                      'Recommendations',
+                      'Profiles',
+                      'Settings',
                     ][page],
                     style: const TextStyle(
                       fontFamily: 'SpaceGrotesk',
@@ -171,7 +173,7 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
                   ),
                   Text(
                     v == null
-                        ? 'Import your Home Village'
+                        ? 'Home Village'
                         : '${v.tag} · Town Hall ${v.townHall}',
                     style: const TextStyle(fontSize: 10, color: muted),
                   ),
@@ -200,14 +202,16 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
                     0 => dashboard(context),
                     1 => upgrades(context),
                     2 => armiesPage(context),
-                    3 => profilesPage(context),
+                    3 => recommendationsPage(context),
+                    4 => profilesPage(context),
                     _ => settings(context),
                   },
           ),
         ),
       ),
       bottomNavigationBar: NavigationBar(
-        height: 70,
+        height: 64,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
         selectedIndex: page,
         onDestinationSelected: (n) => setState(() => page = n),
         destinations: const [
@@ -219,6 +223,10 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
           NavigationDestination(
             icon: Icon(Icons.sports_martial_arts),
             label: 'Armies',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.auto_awesome_outlined),
+            label: 'Recommendations',
           ),
           NavigationDestination(
             icon: Icon(Icons.manage_accounts_outlined),
@@ -253,40 +261,33 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
       ],
     ),
   );
-  Widget emptyVillage() => ListView(
-    padding: const EdgeInsets.all(20),
-    children: [
-      CitadelPanel(
-        color: amber,
-        child: Column(
-          children: [
-            Image.asset('assets/icons/townhall_14.webp', height: 140),
-            const SizedBox(height: 16),
-            title(
-              'Your village command center',
-              subtitle:
-                  'Import game JSON to reveal your upgrades, progress and available armies.',
-            ),
-            const Text(
-              'In Clash, open Settings → More Settings → Export Data. Paste the copied JSON here.',
-              style: TextStyle(color: muted),
-            ),
-            const SizedBox(height: 20),
-            FilledButton.icon(
-              onPressed: importVillage,
-              icon: const Icon(Icons.content_paste_go),
-              label: const Text('Import your first village'),
-            ),
-          ],
+  Widget emptyVillage() => Center(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Image.asset('assets/branding/app-icon.webp', width: 112, height: 112),
+        const SizedBox(height: 20),
+        const Text(
+          'Import village',
+          style: TextStyle(
+            fontFamily: 'SpaceGrotesk',
+            fontSize: 24,
+            fontWeight: FontWeight.w700,
+          ),
         ),
-      ),
-      const SizedBox(height: 16),
-      const CitadelPanel(
-        child: Text(
-          'No login required. Profiles and backups stay on your device. Real imported levels power this dashboard.',
+        const SizedBox(height: 8),
+        const Text(
+          'Clash settings → Export Data',
+          style: TextStyle(fontSize: 12, color: muted),
         ),
-      ),
-    ],
+        const SizedBox(height: 12),
+        actionIcon(
+          'Import your first village',
+          Icons.add_circle_outline,
+          importVillage,
+        ),
+      ],
+    ),
   );
 
   ({int done, int total}) progress(Village v) {
@@ -410,25 +411,37 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
     final v = store.selected;
     if (v == null) return emptyVillage();
     final p = planner(v);
-    final choices = p.choices;
     final stats = progress(v);
     final ratio = stats.total == 0 ? 0.0 : stats.done / stats.total;
-    final costs = p.remainingCosts(choices);
-    final active = v.active;
-    final builderActive = active
-        .where((e) => ['buildings', 'traps', 'heroes'].contains(e.section))
-        .toList();
-    final laboratory = active
-        .where((e) => ['units', 'spells', 'siege_machines'].contains(e.section))
-        .toList();
-    final pets = active.where((e) => e.section == 'pets').toList();
+    final groups = <(String, IconData, List<VillageItem>)>[
+      (
+        'Active Builders',
+        Icons.construction_rounded,
+        v.active
+            .where((e) => ['buildings', 'traps', 'heroes'].contains(e.section))
+            .toList(),
+      ),
+      (
+        'Laboratory',
+        Icons.science_outlined,
+        v.active
+            .where(
+              (e) => ['units', 'spells', 'siege_machines'].contains(e.section),
+            )
+            .toList(),
+      ),
+      (
+        'Pets',
+        Icons.pets_outlined,
+        v.active.where((e) => e.section == 'pets').toList(),
+      ),
+    ];
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
+      padding: const EdgeInsets.all(14),
       children: [
         CitadelPanel(
           color: amber,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
@@ -439,35 +452,34 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
                       section: 'buildings',
                       level: v.townHall,
                     ),
-                    size: 70,
+                    size: 64,
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          v.name,
-                          style: const TextStyle(
-                            fontFamily: 'SpaceGrotesk',
-                            fontSize: 22,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xffffc174),
-                          ),
-                        ),
-                        Text(
                           'Town Hall ${v.townHall}',
                           style: const TextStyle(
                             fontFamily: 'SpaceGrotesk',
+                            fontSize: 23,
                             fontWeight: FontWeight.w700,
+                            color: amber,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        const CitadelLabel(
-                          'Imported village',
-                          color: readyGreen,
-                        ),
                       ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip:
+                        '${dateLabel(v.exportedAt)}${v.needsRefresh(now) ? ' · Import recommended' : ''}',
+                    onPressed: importVillage,
+                    icon: Icon(
+                      v.needsRefresh(now)
+                          ? Icons.sync_problem
+                          : Icons.verified_outlined,
+                      color: v.needsRefresh(now) ? amber : readyGreen,
                     ),
                   ),
                 ],
@@ -477,7 +489,7 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
                   color: const Color(0xff0b111e),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
                   children: [
@@ -485,188 +497,133 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const CitadelLabel(
-                            'Known level progress',
-                            color: muted,
-                          ),
-                          Text(
-                            '${(ratio * 100).toStringAsFixed(1)}%',
-                            style: const TextStyle(
-                              fontFamily: 'SpaceGrotesk',
-                              fontSize: 30,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xffffc174),
+                          const CitadelLabel('Village progress', color: muted),
+                          Tooltip(
+                            message:
+                                'Recorded level progress toward current Town Hall caps, including unbuilt buildings.',
+                            child: Text(
+                              '${(ratio * 100).toStringAsFixed(1)}%',
+                              style: const TextStyle(
+                                fontFamily: 'SpaceGrotesk',
+                                fontSize: 32,
+                                fontWeight: FontWeight.w700,
+                                color: amber,
+                              ),
                             ),
-                          ),
-                          Text(
-                            '${stats.done} / ${stats.total} mapped level steps',
-                            style: const TextStyle(fontSize: 10, color: muted),
                           ),
                         ],
                       ),
                     ),
                     SizedBox(
-                      width: 58,
-                      height: 58,
-                      child: CircularProgressIndicator(
-                        value: ratio,
-                        strokeWidth: 6,
+                      width: 60,
+                      height: 60,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          SizedBox.expand(
+                            child: CircularProgressIndicator(
+                              value: ratio,
+                              strokeWidth: 5,
+                              backgroundColor: amber.withValues(alpha: .1),
+                            ),
+                          ),
+                          const Icon(Icons.fort_rounded, color: amber),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 14),
-              const CitadelLabel(
-                'Resources still needed to TH cap',
-                color: muted,
-              ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 16,
-                runSpacing: 10,
-                children: [
-                  for (final cost in costs.entries.where(
-                    (e) => [
-                      'Gold',
-                      'Elixir',
-                      'Dark Elixir',
-                      'Gold or Elixir',
-                    ].contains(e.key),
-                  ))
-                    amount(cost.key, cost.value),
-                ],
-              ),
               const SizedBox(height: 12),
-              const Text(
-                'Calculated from mapped levels, including missing buildings. Active upgrade costs are already spent.',
-                style: TextStyle(fontSize: 10, color: muted),
-              ),
-              const Divider(),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final group in [
-                    'Buildings',
-                    'Defenses',
-                    'Heroes',
-                    'Lab',
-                    'Walls',
-                  ])
-                    categoryProgress(v, group),
-                ],
+              LayoutBuilder(
+                builder: (context, box) => Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final group in [
+                      'Buildings',
+                      'Defenses',
+                      'Heroes',
+                      'Lab',
+                      'Walls',
+                    ])
+                      SizedBox(
+                        width: (box.maxWidth - 8) / 2,
+                        child: categoryProgress(v, group),
+                      ),
+                  ],
+                ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 14),
-        snapshotNotice(v),
-        const SizedBox(height: 20),
-        sectionHeader(
-          'Active Builders',
-          builderActive.length,
-          Icons.construction_rounded,
-        ),
-        if (builderActive.isEmpty)
-          CitadelPanel(
-            color: amber,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'No builder upgrades recorded',
-                  style: TextStyle(fontWeight: FontWeight.w700),
+        for (final group in groups) ...[
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Icon(
+                group.$2,
+                color: group.$1 == 'Laboratory'
+                    ? elixir
+                    : group.$1 == 'Pets'
+                    ? darkElixir
+                    : amber,
+                size: 19,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  group.$1,
+                  style: const TextStyle(
+                    fontFamily: 'SpaceGrotesk',
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-                const SizedBox(height: 6),
-                const Text(
-                  'Start an eligible upgrade in Clash, then track it here.',
-                  style: TextStyle(color: muted, fontSize: 12),
-                ),
-                const SizedBox(height: 10),
-                FilledButton(
-                  onPressed: () => setState(() => page = 1),
-                  child: const Text('Find an upgrade'),
-                ),
-              ],
+              ),
+              Text(
+                '${group.$3.length}',
+                style: const TextStyle(color: muted, fontSize: 12),
+              ),
+              IconButton(
+                tooltip: 'Recommendations',
+                onPressed: () => setState(() => page = 3),
+                icon: const Icon(Icons.arrow_forward_rounded, size: 19),
+              ),
+            ],
+          ),
+          if (group.$3.isEmpty)
+            CitadelPanel(
+              padding: 12,
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.hourglass_empty_rounded,
+                    color: muted,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text('Idle', style: TextStyle(color: muted)),
+                  ),
+                  IconButton(
+                    tooltip: 'Find an upgrade',
+                    onPressed: () => setState(() => page = 1),
+                    icon: const Icon(Icons.add_rounded, color: amber),
+                  ),
+                ],
+              ),
             ),
-          ),
-        for (final item in builderActive)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: upgradeRow(p.choice(item), p, compact: true),
-          ),
-        const SizedBox(height: 18),
-        sectionHeader(
-          'Laboratory Research',
-          laboratory.length,
-          Icons.science_outlined,
-        ),
-        if (laboratory.isEmpty)
-          const CitadelPanel(
-            child: Text(
-              'No research timer recorded.',
-              style: TextStyle(color: muted),
-            ),
-          ),
-        for (final item in laboratory)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: upgradeRow(p.choice(item), p, compact: true),
-          ),
-        if (pets.isNotEmpty) ...[
-          const SizedBox(height: 18),
-          sectionHeader('Pet House Training', pets.length, Icons.pets_outlined),
-          for (final item in pets)
+          for (final item in group.$3)
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: upgradeRow(p.choice(item), p, compact: true),
             ),
         ],
-        const SizedBox(height: 16),
-        OutlinedButton.icon(
-          onPressed: resourcePlan,
-          icon: const Icon(Icons.account_balance_wallet_outlined),
-          label: const Text('Resource planning & upgrade priorities'),
-        ),
-        const SizedBox(height: 10),
-        OutlinedButton.icon(
-          onPressed: newsPanel,
-          icon: const Icon(Icons.newspaper_outlined),
-          label: const Text('Latest official news & events'),
-        ),
-        if (onAndroid) ...[
-          const SizedBox(height: 10),
-          FilledButton.icon(
-            onPressed: () => act(() => store.deviceAction('openClash')),
-            icon: const Icon(Icons.sports_esports_outlined),
-            label: const Text('Open Clash of Clans'),
-          ),
-        ],
       ],
     );
   }
 
-  Widget sectionHeader(String text, int count, IconData icon) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: Row(
-      children: [
-        Icon(icon, color: amber, size: 21),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(
-              fontFamily: 'SpaceGrotesk',
-              fontSize: 19,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        CitadelLabel('$count tracked', color: muted),
-      ],
-    ),
-  );
   Widget categoryProgress(Village v, String group) {
     var done = 0;
     var max = 0;
@@ -692,23 +649,17 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
     );
   }
 
-  Widget snapshotNotice(Village v) => Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Icon(
-        v.needsRefresh(now) ? Icons.sync_problem : Icons.check_circle_outline,
-        color: v.needsRefresh(now) ? amber : readyGreen,
-        size: 16,
-      ),
-      const SizedBox(width: 7),
-      Expanded(
-        child: Text(
-          'Snapshot ${dateLabel(v.exportedAt)}${v.needsRefresh(now) ? ' · Fresh import recommended' : ''}\nTimers follow saved finish times; game-side changes need a new import.',
-          style: const TextStyle(fontSize: 10, color: muted),
-        ),
-      ),
-    ],
-  );
+  IconData categorySymbol(String category) => switch (category) {
+    'Buildings' => Icons.home_outlined,
+    'Defenses' => Icons.shield_outlined,
+    'Army' => Icons.fort_outlined,
+    'Lab' => Icons.science_outlined,
+    'Heroes' => Icons.person_outline,
+    'Pets' => Icons.pets_outlined,
+    'Equipment' => Icons.hardware_outlined,
+    'Walls' => Icons.view_week_outlined,
+    _ => Icons.grid_view_rounded,
+  };
 
   Widget upgrades(BuildContext context) {
     final v = store.selected;
@@ -790,11 +741,12 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
                 Padding(
                   padding: const EdgeInsets.only(right: 7),
                   child: ChoiceChip(
-                    label: Text(
-                      c,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: category == c ? const Color(0xff241600) : null,
+                    label: Tooltip(
+                      message: c,
+                      child: Icon(
+                        categorySymbol(c),
+                        size: 18,
+                        color: category == c ? Colors.black : muted,
                       ),
                     ),
                     selected: category == c,
@@ -805,29 +757,11 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
           ),
         ),
         const SizedBox(height: 14),
-        CitadelPanel(
-          color: amber,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const CitadelLabel('Eligible at your current Town Hall'),
-              const SizedBox(height: 5),
-              Text(
-                '$eligible upgrades available',
-                style: const TextStyle(
-                  fontFamily: 'SpaceGrotesk',
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              Text(
-                'Town Hall ${v.townHall} · completed building and lab prerequisites checked. Resource affordability is not inferred.',
-                style: const TextStyle(fontSize: 11, color: muted),
-              ),
-            ],
-          ),
+        Text(
+          '$eligible available',
+          style: const TextStyle(color: muted, fontSize: 12),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         Wrap(
           spacing: 8,
           runSpacing: 4,
@@ -836,57 +770,66 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
             const CitadelLabel('Sort', color: muted),
             for (final s in ['Priority', 'Time', 'Cost'])
               ChoiceChip(
-                label: Text(
-                  s,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: sort == s ? const Color(0xff241600) : null,
+                label: Tooltip(
+                  message: s,
+                  child: Icon(
+                    s == 'Priority'
+                        ? Icons.auto_awesome_outlined
+                        : s == 'Time'
+                        ? Icons.schedule_rounded
+                        : Icons.diamond_outlined,
+                    size: 17,
+                    color: sort == s ? Colors.black : muted,
                   ),
                 ),
                 selected: sort == s,
                 onSelected: (_) => setState(() => sort = s),
               ),
             FilterChip(
-              label: const Text('Show locked', style: TextStyle(fontSize: 11)),
+              label: const Tooltip(
+                message: 'Show locked',
+                child: Icon(Icons.lock_outline, size: 17),
+              ),
               selected: showLocked,
               onSelected: (b) => setState(() => showLocked = b),
             ),
             FilterChip(
-              label: const Text('Show maxed', style: TextStyle(fontSize: 11)),
+              label: const Tooltip(
+                message: 'Show maxed',
+                child: Icon(Icons.verified_outlined, size: 17),
+              ),
               selected: showMaxed,
               onSelected: (b) => setState(() => showMaxed = b),
             ),
           ],
         ),
         const SizedBox(height: 12),
-        if (sort == 'Priority')
-          const Padding(
-            padding: EdgeInsets.only(bottom: 12),
-            child: Text(
-              'App planning order: offense & prerequisites → heroes/research → economy → defenses → walls. Adjust for your goals.',
-              style: TextStyle(fontSize: 10, color: muted),
-            ),
-          ),
         for (final group in grouped.values)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: upgradeRow(group.first, p, count: group.length),
           ),
-        if (grouped.isEmpty)
-          const CitadelPanel(
-            child: Text(
-              'No matching eligible upgrades. Try another category or reveal locked and maxed items.',
-            ),
-          ),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(
-          onPressed: resourcePlan,
-          icon: const Icon(Icons.account_balance_wallet_outlined),
-          label: const Text('Plan remaining resources'),
-        ),
+        if (grouped.isEmpty) const CitadelPanel(child: Text('No upgrades')),
       ],
     );
   }
+
+  String finishLabel(DateTime date) {
+    final local = date.toLocal();
+    final labels = MaterialLocalizations.of(ui);
+    return '${labels.formatShortDate(local)} · ${labels.formatTimeOfDay(TimeOfDay.fromDateTime(local), alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(ui))}';
+  }
+
+  Widget actionIcon(
+    String label,
+    IconData icon,
+    VoidCallback? action, {
+    Color color = amber,
+  }) => IconButton(
+    tooltip: label,
+    onPressed: action,
+    icon: Icon(icon, color: color, size: 21),
+  );
 
   Widget upgradeRow(
     UpgradeChoice option,
@@ -897,20 +840,18 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
     final item = option.item;
     final level = option.level;
     final active = item.upgrading;
-    final color = resourceColor(item);
     final costs = level == null ? <String, num>{} : p.costs(item, level);
-    final canStart = option.eligible && busy != item.key;
     return CitadelPanel(
-      color: active ? color : null,
-      padding: 14,
+      color: active ? resourceColor(item) : null,
+      padding: 12,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              itemImage(item, size: compact ? 48 : 58),
-              const SizedBox(width: 12),
+              itemImage(item, size: 48),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -919,144 +860,121 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
                       catalogue.name(item),
                       style: const TextStyle(
                         fontFamily: 'SpaceGrotesk',
-                        fontSize: 17,
+                        fontSize: 15,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Wrap(
-                      spacing: 7,
-                      runSpacing: 5,
-                      children: [
-                        Text(
-                          item.level == 0
-                              ? 'Not built'
-                              : 'LVL ${item.level}${level != null ? ' → ${item.targetLevel ?? item.level + 1}' : ''}',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        if (count > 1)
-                          CitadelLabel('$count available', color: muted),
-                        if (option.maxed)
-                          const CitadelLabel('TH MAX', color: readyGreen),
-                      ],
+                    const SizedBox(height: 3),
+                    Text(
+                      '${item.level == 0 ? 'New' : 'Lv ${item.level}'}${level != null && !option.maxed ? ' → ${item.targetLevel ?? item.level + 1}' : ''}${count > 1 ? '  ×$count' : ''}${option.maxed ? ' · Max' : ''}',
+                      style: const TextStyle(fontSize: 10, color: muted),
                     ),
-                    if (costs.isNotEmpty) ...[
-                      const SizedBox(height: 7),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 5,
-                        children: [
-                          for (final c in costs.entries) amount(c.key, c.value),
-                        ],
-                      ),
-                    ],
-                    if (!active && level != null)
+                    if (costs.isNotEmpty && !option.maxed)
                       Padding(
-                        padding: const EdgeInsets.only(top: 6),
-                        child: Text(
-                          timeLabel({
-                            ...level,
-                            'seconds': p.duration(item, level),
-                          }),
-                          style: const TextStyle(fontSize: 11, color: muted),
+                        padding: const EdgeInsets.only(top: 5),
+                        child: Wrap(
+                          spacing: 7,
+                          runSpacing: 4,
+                          children: [
+                            for (final c in costs.entries)
+                              amount(c.key, c.value),
+                          ],
                         ),
                       ),
                   ],
                 ),
               ),
-            ],
-          ),
-          const Divider(height: 22),
-          if (active) ...[
-            Row(
-              children: [
-                Expanded(child: countdown(item)),
-                if (busy == item.key)
-                  const SizedBox(
+              if (busy == item.key)
+                const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                else ...[
-                  TextButton(
-                    onPressed: () =>
-                        rowAction(item.key, () => store.complete(item)),
-                    child: const Text(
-                      'Complete',
-                      style: TextStyle(
-                        color: readyGreen,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
                   ),
-                  TextButton(
-                    onPressed: () =>
-                        rowAction(item.key, () => store.cancel(item)),
-                    child: const Text(
-                      'Cancel',
-                      style: TextStyle(color: muted, fontSize: 12),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            liveProgress(item),
-            Text(
-              item.startedAt == null
-                  ? 'Imported finish time'
-                  : 'Tracked countdown · estimated duration',
-              style: const TextStyle(fontSize: 9, color: muted),
-            ),
-          ] else
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: Text(
-                    option.eligible
-                        ? (option.missing
-                              ? 'Available to build'
-                              : 'Ready to upgrade')
-                        : option.maxed
-                        ? option.lockReason!
-                        : option.lockReason ?? 'Unavailable',
-                    style: TextStyle(
-                      color: option.eligible ? readyGreen : muted,
-                      fontSize: 11,
+                )
+              else if (active) ...[
+                actionIcon(
+                  'Complete ${catalogue.name(item)}',
+                  Icons.check_circle_outline,
+                  () => rowAction(item.key, () => store.complete(item)),
+                  color: readyGreen,
+                ),
+                actionIcon(
+                  'Cancel ${catalogue.name(item)}',
+                  Icons.close_rounded,
+                  () => rowAction(item.key, () => store.cancel(item)),
+                  color: muted,
+                ),
+              ] else if (option.eligible)
+                actionIcon(
+                  '${option.missing ? 'Build' : 'Upgrade'} ${catalogue.name(item)}',
+                  option.missing
+                      ? Icons.add_home_work_outlined
+                      : Icons.upgrade_rounded,
+                  () =>
+                      rowAction(item.key, () => store.start(option, catalogue)),
+                )
+              else
+                Tooltip(
+                  message: option.lockReason ?? 'Unavailable',
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Icon(
+                      option.maxed
+                          ? Icons.verified_outlined
+                          : Icons.lock_outline,
+                      color: muted,
+                      size: 18,
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
-                if (option.eligible)
-                  FilledButton(
-                    onPressed: canStart
-                        ? () => rowAction(
-                            item.key,
-                            () => store.start(option, catalogue),
-                          )
-                        : null,
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(0, 36),
-                    ),
-                    child: Text(
-                      busy == item.key
-                          ? 'Saving…'
-                          : option.missing
-                          ? 'Build'
-                          : 'Upgrade',
-                    ),
+            ],
+          ),
+          if (active) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              spacing: 14,
+              runSpacing: 5,
+              children: [
+                countdown(item),
+                Tooltip(
+                  message: 'Completion time',
+                  child: Text(
+                    finishLabel(item.finishesAt!),
+                    style: const TextStyle(color: muted, fontSize: 11),
                   ),
+                ),
               ],
             ),
-          if (p.discount(item) > 0 && level != null && !active)
+            liveProgress(item),
+          ] else if (level != null && !option.maxed)
             Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(
-                '${p.discount(item)}% selected boost · rounded estimate',
-                style: const TextStyle(fontSize: 9, color: muted),
+              padding: const EdgeInsets.only(top: 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.schedule_rounded, size: 13, color: muted),
+                  const SizedBox(width: 5),
+                  Text(
+                    timeLabel({...level, 'seconds': p.duration(item, level)}),
+                    style: const TextStyle(fontSize: 11, color: muted),
+                  ),
+                  if (p.discount(item) > 0)
+                    Text(
+                      ' · −${p.discount(item)}%',
+                      style: const TextStyle(fontSize: 10, color: readyGreen),
+                    ),
+                  if (!option.eligible) ...[
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        option.lockReason ?? '',
+                        style: const TextStyle(color: muted, fontSize: 10),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
         ],
@@ -1071,425 +989,260 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
     if (mounted) setState(() => busy = null);
   }
 
-  Widget armiesPage(BuildContext context) {
+  Widget recommendationsPage(BuildContext context) {
     final v = store.selected;
     if (v == null) return emptyVillage();
-    final capacity = campCapacity(v, catalogue);
-    final plans = armyPlans(
-      v,
-      catalogue,
-    ).where((p) => armyType == 'All' || p.type == armyType).toList();
+    final p = planner(v);
+    final next = p.recommendations;
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       children: [
-        CitadelPanel(
-          color: elixir,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const CitadelLabel('Army planning', color: elixir),
-              const SizedBox(height: 7),
-              Text(
-                '$capacity housing from your camps',
-                style: const TextStyle(
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Next upgrades',
+                style: TextStyle(
                   fontFamily: 'SpaceGrotesk',
-                  fontSize: 23,
+                  fontSize: 22,
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              const Text(
-                'Calculated composition suggestions use your imported troops and levels. These are planning recommendations, not your trained army or measured performance.',
-                style: TextStyle(fontSize: 11, color: muted),
-              ),
-            ],
-          ),
+            ),
+            Tooltip(
+              message:
+                  'App priority: offense and prerequisites, research/heroes, economy, defenses, then walls. Current Town Hall and completed prerequisites only; balances are unknown.',
+              child: const Icon(Icons.info_outline, size: 18, color: muted),
+            ),
+          ],
         ),
         const SizedBox(height: 14),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              for (final type in [
-                'All',
-                'Air',
-                'Ground',
-                'Farming',
-                'Practice',
-              ])
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text(
-                      type,
-                      style: TextStyle(
-                        color: armyType == type ? Colors.black : null,
+        if (next.isEmpty)
+          const CitadelPanel(
+            child: Text('No eligible upgrades', style: TextStyle(color: muted)),
+          ),
+        for (var n = 0; n < next.length; n++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (n == 0)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 8),
+                    child: CitadelLabel('Next best'),
+                  ),
+                upgradeRow(next[n], p),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget armiesPage(BuildContext context) {
+    final v = store.selected;
+    if (v == null) return emptyVillage();
+    return FutureBuilder<List<SourcedArmy>>(
+      future: armyCatalogue,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return Center(
+            child: snapshot.hasError
+                ? const Text('Armies unavailable')
+                : const CircularProgressIndicator(),
+          );
+        }
+        final plans = snapshot.data!
+            .where(
+              (a) =>
+                  a.townHall == v.townHall &&
+                  (armyType == 'All' || a.type == armyType),
+            )
+            .toList();
+        return ListView(
+          padding: const EdgeInsets.all(14),
+          children: [
+            Wrap(
+              spacing: 8,
+              children: [
+                for (final type in ['All', 'Air', 'Ground', 'Hybrid'])
+                  ChoiceChip(
+                    label: Tooltip(
+                      message: type,
+                      child: Icon(
+                        type == 'All'
+                            ? Icons.grid_view_rounded
+                            : type == 'Air'
+                            ? Icons.air_rounded
+                            : type == 'Ground'
+                            ? Icons.terrain_rounded
+                            : Icons.merge_type_rounded,
+                        size: 18,
+                        color: armyType == type ? Colors.black : muted,
                       ),
                     ),
                     selected: armyType == type,
                     onSelected: (_) => setState(() => armyType = type),
                   ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            for (final plan in plans)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: armyCard(plan),
+              ),
+            if (plans.isEmpty)
+              const CitadelPanel(
+                child: Text(
+                  'No verified compositions',
+                  style: TextStyle(color: muted),
                 ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-        for (final plan in plans)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: armyCard(plan, v, capacity),
-          ),
-        if (plans.isEmpty)
-          const CitadelPanel(
-            child: Text(
-              'Army capacity or troop data is not mapped for this snapshot. Import full village JSON to generate a plan.',
-            ),
-          ),
-        const SizedBox(height: 12),
-        guidePanel('War preparation', [
-          'Scout the assigned target and identify the Clan Castle, defending heroes, Town Hall and major defenses before choosing an entry.',
-          'Choose an army you can practise in friendly challenges. Plan the funnel, spell timings, cleanup and siege role around that specific base.',
-          'Coordinate target assignments with your clan. Check hero, equipment, siege and reinforcement availability in-game before committing.',
-          'Review the replay after each attack. Track what happened rather than assuming a strategy guarantees stars.',
-        ]),
-        const SizedBox(height: 14),
-        guidePanel('Farming and progression', [
-          'Open the eligible-upgrade list and choose a concrete resource goal. The resource planner calculates catalogue costs still ahead of your village.',
-          'Prioritise capacity or storage prerequisites that prevent your next upgrade. Keep a useful attack army levelled so farming remains practical.',
-          'Choose reachable loot and a suitable route into collectors or storages. The best entry depends on the defending base, not a fixed deployment pattern.',
-          'After spending resources on upgrades, import fresh village JSON. The tracker does not know your live resource balances.',
-        ]),
-        const SizedBox(height: 14),
-        OutlinedButton.icon(
-          onPressed: () => act(
-            () => open(
-              'https://supercell.com/en/games/clashofclans/blog/news/home-village-changes-2/',
-            ),
-          ),
-          icon: const Icon(Icons.open_in_new),
-          label: const Text('Official army & village update'),
-        ),
-      ],
+              ),
+          ],
+        );
+      },
     );
   }
 
-  Widget armyCard(ArmyPlan plan, Village v, int capacity) {
-    final occupied = plan.roster.entries.fold<int>(
-      0,
-      (n, e) =>
-          n +
-          ((catalogue.entry(e.key)?['housing'] as num? ?? 0) * e.value).toInt(),
-    );
-    return CitadelPanel(
-      color: elixir,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CitadelLabel('${plan.type} · calculated plan', color: elixir),
-          const SizedBox(height: 8),
-          Text(
-            plan.title,
-            style: const TextStyle(
-              fontFamily: 'SpaceGrotesk',
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Army roster · $occupied / $capacity housing',
-            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 9,
-            runSpacing: 9,
-            children: [
-              for (final e in plan.roster.entries)
-                SizedBox(
-                  width: 75,
-                  child: Column(
-                    children: [
-                      Stack(
-                        children: [
-                          itemImage(
-                            v.items.firstWhere((i) => i.data == e.key),
-                            size: 64,
-                          ),
-                          Positioned(
-                            right: 0,
-                            top: 0,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 5,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: amber,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                '×${e.value}',
-                                style: const TextStyle(
-                                  color: Colors.black,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        catalogue.entry(e.key)?['name'] ?? 'Unmapped',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 10),
-                      ),
-                      Text(
-                        'Lv ${v.items.firstWhere((i) => i.data == e.key).level}',
-                        style: const TextStyle(fontSize: 10, color: muted),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          ExpansionTile(
-            tilePadding: EdgeInsets.zero,
-            title: Text(
-              'Spells & support · ${spellCapacity(v, catalogue)} spell capacity',
-              style: const TextStyle(
-                fontFamily: 'SpaceGrotesk',
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            children: [
-              for (final section in [
-                'spells',
-                'siege_machines',
-                'heroes',
-                'equipment',
-              ])
-                if (v.items.any((e) => e.section == section))
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        CitadelLabel(
-                          'Owned ${section.replaceAll('_', ' ')}',
-                          color: elixir,
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 7,
-                          runSpacing: 7,
-                          children: [
-                            for (final item in v.items.where(
-                              (e) => e.section == section,
-                            ))
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 7,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xff0b111e),
-                                  borderRadius: BorderRadius.circular(7),
-                                ),
-                                child: Text(
-                                  '${catalogue.name(item)} · Lv ${item.level}',
-                                  style: const TextStyle(
-                                    fontSize: 10,
-                                    color: muted,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ExpansionTile(
-            tilePadding: EdgeInsets.zero,
-            title: const Text(
-              'Tactical attack plan',
-              style: TextStyle(
-                fontFamily: 'SpaceGrotesk',
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            children: [
-              for (var n = 0; n < plan.steps.length; n++)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      CitadelLabel('P${n + 1}'),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          plan.steps[n],
-                          style: const TextStyle(fontSize: 12, color: muted),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-          FilledButton.icon(
-            onPressed: () => act(() async {
-              final text =
-                  '${plan.title}\n${plan.roster.entries.map((e) => '${e.value} × ${catalogue.entry(e.key)?['name']}').join('\n')}\n$occupied/$capacity housing\nCalculated COCTracker plan; verify spells and heroes in-game.';
-              await Clipboard.setData(ClipboardData(text: text));
-              message('Army plan copied.');
-            }),
-            icon: const Icon(Icons.copy),
-            label: const Text('Copy army plan'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget guidePanel(String heading, List<String> paragraphs) => CitadelPanel(
+  Widget armyCard(SourcedArmy plan) => CitadelPanel(
+    color: elixir,
+    padding: 12,
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          heading,
-          style: const TextStyle(
-            fontFamily: 'SpaceGrotesk',
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 10),
-        for (var n = 0; n < paragraphs.length; n++)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Text(
-              '${n + 1}. ${paragraphs[n]}',
-              style: const TextStyle(fontSize: 12, color: muted),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                plan.title,
+                style: const TextStyle(
+                  fontFamily: 'SpaceGrotesk',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 17,
+                ),
+              ),
             ),
+            actionIcon(
+              'Source: Clash Armies',
+              Icons.open_in_new,
+              () => act(() => open(plan.source)),
+              color: muted,
+            ),
+            actionIcon(
+              'Copy composition',
+              Icons.copy_rounded,
+              () => act(() async {
+                await Clipboard.setData(
+                  ClipboardData(text: plan.clipboardText),
+                );
+                message('Copied');
+              }),
+            ),
+          ],
+        ),
+        CitadelLabel(plan.type, color: elixir),
+        const SizedBox(height: 12),
+        armyUnits(plan.troops, plan.artwork),
+        if (plan.spells.isNotEmpty) ...[
+          const Divider(height: 20),
+          armyUnits(plan.spells, plan.artwork),
+        ],
+        if (plan.heroes.isNotEmpty) ...[
+          const Divider(height: 20),
+          armyUnits(
+            {for (final name in plan.heroes) name: 1},
+            plan.artwork,
+            heroes: true,
           ),
+        ],
       ],
     ),
   );
 
-  Future<void> resourcePlan() async {
-    final v = store.selected;
-    if (v == null) return;
-    final p = planner(v);
-    final choices = p.choices;
-    final totals = p.remainingCosts(choices);
-    var work = 0;
-    for (final c in choices) {
-      final cap = catalogue.maxLevel(c.item, v.townHall);
-      if (cap == null) continue;
-      for (final l
-          in catalogue
-              .levels(c.item.data)
-              .where(
-                (l) =>
-                    l['level'] > (c.item.targetLevel ?? c.item.level) &&
-                    l['level'] <= cap,
-              )) {
-        work += p.duration(c.item, l);
-      }
-    }
-    await showModalBottomSheet<void>(
-      context: ui,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: SizedBox(
-          height: MediaQuery.sizeOf(context).height * .87,
-          child: ListView(
-            padding: const EdgeInsets.all(20),
+  Widget armyUnits(
+    Map<String, int> units,
+    Map<String, String> artwork, {
+    bool heroes = false,
+  }) => Wrap(
+    spacing: 8,
+    runSpacing: 10,
+    children: [
+      for (final entry in units.entries)
+        SizedBox(
+          width: 64,
+          child: Column(
             children: [
-              title(
-                'Resource planning',
-                subtitle: 'Remaining known upgrades at Town Hall ${v.townHall}',
-              ),
-              CitadelPanel(
-                color: amber,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              Tooltip(
+                message: entry.key,
+                child: Stack(
                   children: [
-                    const CitadelLabel('Remaining costs'),
-                    const SizedBox(height: 12),
-                    for (final e in totals.entries)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: amount(e.key, e.value),
+                    armyUnitImage(entry.key, artwork),
+                    if (!heroes)
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: amber,
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                          child: Text(
+                            '×${entry.value}',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.black,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
                       ),
-                    const Text(
-                      'Includes missing buildings and all mapped levels up to this TH cap. Excludes upgrades already paid for and in progress. Unknown costs are not guessed.',
-                      style: TextStyle(fontSize: 11, color: muted),
-                    ),
                   ],
                 ),
               ),
-              const SizedBox(height: 14),
-              CitadelPanel(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const CitadelLabel('Total remaining upgrade work'),
-                    const SizedBox(height: 8),
-                    Text(
-                      work == 0
-                          ? 'No mapped work remaining'
-                          : durationLabel(Duration(seconds: work)),
-                      style: const TextStyle(
-                        fontFamily: 'SpaceGrotesk',
-                        fontSize: 25,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const Text(
-                      'Sum of known durations, not a completion date. Builders, the laboratory and pets can work in parallel. Selected boosts apply as estimates.',
-                      style: TextStyle(fontSize: 11, color: muted),
-                    ),
-                  ],
-                ),
+              const SizedBox(height: 4),
+              Text(
+                entry.key,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 9, color: muted),
               ),
-              const SizedBox(height: 14),
-              guidePanel('Upgrade priorities', [
-                'Unlock useful offense and prerequisites first: laboratory, camps, Clan Castle and production buildings. This is an app planning rule, not an official ranking.',
-                'Keep the troops, spells, heroes and equipment used by your attack plan progressing. Coordinate hero availability with your clan’s war schedule.',
-                'Check storages before saving for an upgrade. Resolve resource capacity requirements before the builder becomes free.',
-                'Use the Cost sort within each currency and Time sort to fit your available resources and play schedule. Gold and Dark Elixir are not treated as interchangeable.',
-                'Spend surplus resources toward walls when appropriate. Re-import whenever you want to reconcile manual tracking with the game.',
-              ]),
             ],
           ),
         ),
+    ],
+  );
+
+  Widget armyUnitImage(String name, Map<String, String> artwork) {
+    final path = artwork[normaliseArmyName(name)];
+    return Container(
+      width: 54,
+      height: 54,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: const Color(0xff0b111e),
+        borderRadius: BorderRadius.circular(9),
       ),
+      child: path == null
+          ? const Icon(Icons.help_outline, color: muted)
+          : Image.asset(path, fit: BoxFit.contain),
     );
   }
 
   Widget profilesPage(BuildContext context) => ListView(
-    padding: const EdgeInsets.all(16),
+    padding: const EdgeInsets.all(14),
     children: [
-      const CitadelLabel('Active village focus', color: readyGreen),
-      const SizedBox(height: 12),
       for (final v in store.villages)
         Padding(
-          padding: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.only(bottom: 12),
           child: CitadelPanel(
             color: v == store.selected ? amber : null,
+            padding: 12,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
@@ -1500,7 +1253,7 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
                         section: 'buildings',
                         level: v.townHall,
                       ),
-                      size: 62,
+                      size: 54,
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -1511,48 +1264,47 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
                             v.name,
                             style: const TextStyle(
                               fontFamily: 'SpaceGrotesk',
-                              fontSize: 22,
+                              fontSize: 20,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                           Text(
-                            '${v.tag} · TH ${v.townHall}',
+                            '${v.tag} · TH${v.townHall}',
                             style: const TextStyle(fontSize: 11, color: muted),
                           ),
-                          if (v == store.selected)
-                            const CitadelLabel(
-                              'Current active',
-                              color: readyGreen,
-                            ),
                         ],
                       ),
                     ),
+                    if (v == store.selected)
+                      const Icon(
+                        Icons.check_circle_outline,
+                        color: readyGreen,
+                        size: 19,
+                      ),
                   ],
                 ),
-                const SizedBox(height: 14),
-                Text(
-                  '${v.active.length} recorded upgrades · Imported ${dateLabel(v.exportedAt)}',
-                  style: const TextStyle(fontSize: 11, color: muted),
-                ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 Row(
                   children: [
                     Expanded(
-                      child: FilledButton(
-                        onPressed: () => act(() async {
-                          store.selectedTag = v.tag;
-                          await store.save();
-                          setState(() => page = 0);
-                        }),
-                        child: Text(
-                          v == store.selected ? 'View village' : 'Switch',
-                        ),
+                      child: Text(
+                        '${v.active.length} upgrades · ${dateLabel(v.exportedAt)}',
+                        style: const TextStyle(fontSize: 10, color: muted),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      tooltip: 'Rename ${v.name}',
-                      onPressed: () => act(() async {
+                    actionIcon(
+                      'Select ${v.name}',
+                      Icons.swap_horiz,
+                      () => act(() async {
+                        store.selectedTag = v.tag;
+                        await store.save();
+                        setState(() => page = 0);
+                      }),
+                    ),
+                    actionIcon(
+                      'Rename ${v.name}',
+                      Icons.edit_outlined,
+                      () => act(() async {
                         final name = await askText(
                           'Rename village',
                           'Nickname',
@@ -1563,21 +1315,22 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
                           await store.save();
                         }
                       }),
-                      icon: const Icon(Icons.edit_outlined),
+                      color: muted,
                     ),
-                    IconButton(
-                      tooltip: 'Remove ${v.name}',
-                      onPressed: () => act(() async {
+                    actionIcon(
+                      'Remove ${v.name}',
+                      Icons.delete_outline,
+                      () => act(() async {
                         if (await confirmIn(
                           ui,
                           'Remove ${v.name}?',
-                          'This removes the local profile. Export a backup first to keep manual changes.',
+                          'This removes the local profile. Export a backup to keep it.',
                         )) {
                           store.villages.remove(v);
                           await store.save();
                         }
                       }),
-                      icon: const Icon(Icons.delete_outline),
+                      color: muted,
                     ),
                   ],
                 ),
@@ -1585,22 +1338,11 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
             ),
           ),
         ),
-      CitadelPanel(
-        color: amber,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            title(
-              'Link another village',
-              subtitle:
-                  'Import another account’s in-game JSON. Each player tag gets its own local profile.',
-            ),
-            FilledButton.icon(
-              onPressed: importVillage,
-              icon: const Icon(Icons.add),
-              label: const Text('Import village JSON'),
-            ),
-          ],
+      Center(
+        child: actionIcon(
+          'Import another village',
+          Icons.add_circle_outline,
+          importVillage,
         ),
       ),
     ],
@@ -1609,26 +1351,30 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
   Widget settings(BuildContext context) {
     final v = store.selected;
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       children: [
-        title(
-          'Settings & local data',
-          subtitle: 'Your snapshots stay on this device.',
-        ),
         if (v != null) ...[
           CitadelPanel(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const CitadelLabel('Gold Pass boosts'),
-                const SizedBox(height: 8),
-                const Text(
-                  'Select the discounts currently unlocked in-game. These adjust new manual timers and planning estimates; imported timers stay unchanged.',
-                  style: TextStyle(fontSize: 11, color: muted),
+                Row(
+                  children: [
+                    const Expanded(child: CitadelLabel('Gold Pass')),
+                    actionIcon(
+                      'Boosts affect new estimates only',
+                      Icons.info_outline,
+                      () => act(
+                        () => open(
+                          'https://sc-clashofclans.zendesk.com/hc/en-us/articles/49529123544091-Gold-Pass',
+                        ),
+                      ),
+                      color: muted,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
                 boostSelector(
-                  'Builder boost',
+                  'Builder',
                   v.builderDiscount,
                   (n) => act(() async {
                     v.builderDiscount = n;
@@ -1636,76 +1382,59 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
                   }),
                 ),
                 boostSelector(
-                  'Research boost',
+                  'Research',
                   v.researchDiscount,
                   (n) => act(() async {
                     v.researchDiscount = n;
                     await store.save();
                   }),
                 ),
-                TextButton(
-                  onPressed: () => act(
-                    () => open(
-                      'https://sc-clashofclans.zendesk.com/hc/en-us/articles/49529123544091-Gold-Pass',
-                    ),
-                  ),
-                  child: const Text('Official Gold Pass information'),
-                ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
         ],
         CitadelPanel(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              const CitadelLabel('Theme mode'),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final pair in [
-                    ('citadel', 'Dark Citadel'),
-                    ('onyx', 'Onyx Black'),
-                    ('purple', 'Midnight Purple'),
-                  ])
-                    ChoiceChip(
-                      label: Text(
-                        pair.$2,
-                        style: TextStyle(
-                          color: store.theme == pair.$1 ? Colors.black : null,
-                          fontSize: 11,
-                        ),
-                      ),
-                      selected: store.theme == pair.$1,
-                      onSelected: (_) => act(() async {
-                        store.theme = pair.$1;
-                        await store.save();
-                      }),
+              const Expanded(child: CitadelLabel('Theme')),
+              for (final pair in [
+                ('citadel', 'Dark Citadel', Color(0xff181e2c)),
+                ('onyx', 'Onyx Black', Color(0xff000000)),
+                ('purple', 'Midnight Purple', Color(0xff442762)),
+              ])
+                Tooltip(
+                  message: pair.$2,
+                  child: IconButton(
+                    isSelected: store.theme == pair.$1,
+                    onPressed: () => act(() async {
+                      store.theme = pair.$1;
+                      await store.save();
+                    }),
+                    icon: Icon(Icons.circle, color: pair.$3),
+                    selectedIcon: Icon(
+                      Icons.check_circle,
+                      color: pair.$3 == const Color(0xff000000) ? muted : amber,
                     ),
-                ],
-              ),
+                  ),
+                ),
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         CitadelPanel(
-          padding: 0,
+          padding: 12,
           child: Column(
             children: [
               SwitchListTile(
+                contentPadding: EdgeInsets.zero,
                 title: const Text(
-                  'Check-in & upgrade reminders',
-                  style: TextStyle(
-                    fontFamily: 'SpaceGrotesk',
-                    fontWeight: FontWeight.w700,
-                  ),
+                  'Reminders',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
                 ),
                 subtitle: const Text(
-                  '24 hours away from Clash; repeats every 3 hours outside quiet hours. Also alerts when upgrade timers end.',
-                  style: TextStyle(fontSize: 11),
+                  '24h · every 3h',
+                  style: TextStyle(fontSize: 10, color: muted),
                 ),
                 value: store.reminders,
                 onChanged: !onAndroid
@@ -1719,172 +1448,152 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
                         redraw();
                       }),
               ),
-              ListTile(
-                leading: const Icon(Icons.bedtime_outlined, color: elixir),
-                title: const Text('Quiet hours'),
-                subtitle: Text(
-                  '${hourLabel(store.quietStart)} – ${hourLabel(store.quietEnd)}',
-                ),
-                onTap: quietHours,
+              Row(
+                children: [
+                  const Icon(Icons.bedtime_outlined, color: elixir, size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      '${hourLabel(store.quietStart)} – ${hourLabel(store.quietEnd)}',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ),
+                  actionIcon(
+                    'Quiet hours',
+                    Icons.edit_outlined,
+                    quietHours,
+                    color: muted,
+                  ),
+                ],
               ),
-              FutureBuilder<Map<String, dynamic>>(
-                future: store.deviceStatus(),
-                builder: (context, snapshot) {
-                  final status = snapshot.data ?? {};
-                  return Column(
-                    children: [
-                      ListTile(
-                        leading: const Icon(
+              if (onAndroid)
+                FutureBuilder<Map<String, dynamic>>(
+                  future: store.deviceStatus(),
+                  builder: (context, snapshot) {
+                    final status = snapshot.data ?? {};
+                    return Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Permissions',
+                            style: TextStyle(fontSize: 12, color: muted),
+                          ),
+                        ),
+                        actionIcon(
+                          'Usage access${status['usageAccess'] == true ? ' · granted' : ''}',
                           Icons.query_stats,
-                          color: darkElixir,
+                          () => act(() => store.deviceAction('usageSettings')),
+                          color: status['usageAccess'] == true
+                              ? readyGreen
+                              : amber,
                         ),
-                        title: const Text('Usage Access'),
-                        subtitle: Text(
-                          status['supported'] == false
-                              ? 'Available in the Android app'
-                              : status['usageAccess'] == true
-                              ? 'Granted · local Clash launch detection'
-                              : 'Allow detection of when Clash was opened',
-                          style: const TextStyle(fontSize: 11),
-                        ),
-                        onTap: !onAndroid
-                            ? null
-                            : () => act(
-                                () => store.deviceAction('usageSettings'),
-                              ),
-                      ),
-                      if (onAndroid)
-                        ListTile(
-                          leading: const Icon(
-                            Icons.notifications_outlined,
-                            color: amber,
-                          ),
-                          title: const Text('Notification permission'),
-                          subtitle: Text(
-                            status['notifications'] == true
-                                ? 'Allowed'
-                                : 'Tap to allow in Android settings',
-                          ),
-                          onTap: () => act(
+                        actionIcon(
+                          'Notifications${status['notifications'] == true ? ' · allowed' : ''}',
+                          Icons.notifications_outlined,
+                          () => act(
                             () => store.deviceAction('notificationSettings'),
                           ),
+                          color: status['notifications'] == true
+                              ? readyGreen
+                              : amber,
                         ),
-                    ],
-                  );
-                },
-              ),
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: Text(
-                  'Android may delay background checks. Opening Clash is detected per device, not per village.',
-                  style: TextStyle(fontSize: 10, color: muted),
+                      ],
+                    );
+                  },
                 ),
-              ),
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         CitadelPanel(
-          padding: 0,
-          child: Column(
+          child: Wrap(
+            alignment: WrapAlignment.spaceEvenly,
+            spacing: 12,
             children: [
-              ListTile(
-                leading: const Icon(Icons.download_outlined, color: amber),
-                title: const Text('Export backup'),
-                subtitle: const Text('All local profiles and preferences'),
-                onTap: exportBackup,
+              actionIcon(
+                'Export backup',
+                Icons.download_outlined,
+                exportBackup,
               ),
-              ListTile(
-                leading: const Icon(Icons.restore, color: amber),
-                title: const Text('Restore backup'),
-                onTap: restoreBackup,
+              actionIcon(
+                'Restore backup',
+                Icons.restore_rounded,
+                restoreBackup,
               ),
-              ListTile(
-                leading: const Icon(
-                  Icons.cloud_download_outlined,
-                  color: darkElixir,
-                ),
-                title: const Text('Refresh upgrade catalogue'),
-                subtitle: Text(
-                  'Snapshot ${catalogue.updatedAt.split('T').first} · community maintained',
-                  style: const TextStyle(fontSize: 11),
-                ),
-                trailing: refreshing
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.refresh),
-                onTap: refreshing
+              actionIcon(
+                'Refresh catalogue · ${catalogue.updatedAt.split('T').first}',
+                Icons.cloud_download_outlined,
+                refreshing
                     ? null
                     : () => act(() async {
                         setState(() => refreshing = true);
                         try {
                           final next = await refreshCatalogue(store.prefs);
                           if (mounted) setState(() => catalogue = next);
-                          message('Catalogue refreshed.');
+                          message('Updated');
                         } finally {
                           if (mounted) setState(() => refreshing = false);
                         }
                       }),
               ),
-              ListTile(
-                leading: const Icon(Icons.newspaper_outlined, color: amber),
-                title: const Text('Official news & events'),
-                onTap: newsPanel,
-              ),
-              ListTile(
-                leading: const Icon(Icons.code, color: muted),
-                title: const Text('Source & APK releases'),
-                onTap: () => act(
+              actionIcon('Official news', Icons.newspaper_outlined, newsPanel),
+              actionIcon(
+                'Source & releases',
+                Icons.code,
+                () => act(
                   () => open('https://github.com/saimadhav10/COCTracker'),
                 ),
               ),
-              ListTile(
-                leading: const Icon(Icons.info_outline, color: muted),
-                title: const Text('About & credits'),
-                onTap: about,
-              ),
+              actionIcon('About & credits', Icons.info_outline, about),
+              if (onAndroid)
+                actionIcon(
+                  'Open Clash of Clans',
+                  Icons.sports_esports_outlined,
+                  () => act(() => store.deviceAction('openClash')),
+                ),
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         CitadelPanel(
           color: amber,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              const CitadelLabel('About the Creator'),
-              const SizedBox(height: 10),
-              const Text(
-                '@saimadhav10',
-                style: TextStyle(
-                  fontFamily: 'SpaceGrotesk',
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CitadelLabel('About the Creator'),
+                    SizedBox(height: 8),
+                    Text(
+                      '@saimadhav10',
+                      style: TextStyle(
+                        fontFamily: 'SpaceGrotesk',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 20,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: () =>
-                    act(() => open('https://github.com/saimadhav10')),
-                icon: const Icon(Icons.code),
-                label: const Text('View creator on GitHub'),
+              actionIcon(
+                'Creator on GitHub',
+                Icons.open_in_new,
+                () => act(() => open('https://github.com/saimadhav10')),
               ),
             ],
           ),
         ),
         if (store.platformError != null)
           Text(
-            'Reminder setup: ${store.platformError}',
-            style: const TextStyle(color: amber),
+            store.platformError!,
+            style: const TextStyle(color: amber, fontSize: 11),
           ),
-        const SizedBox(height: 22),
+        const SizedBox(height: 20),
         const Text(
-          'COCTracker v2.0.0\nLocal JSON tracking · Unofficial Supercell fan app',
+          'COCTracker 3.0.0',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 11, color: muted),
+          style: TextStyle(fontSize: 10, color: muted),
         ),
       ],
     );
@@ -1918,14 +1627,13 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
           child: ListView(
             padding: const EdgeInsets.all(20),
             children: [
-              title(
-                'Official village bulletin',
-                subtitle:
-                    'Supercell news, balance changes and event announcements.',
-              ),
+              title('Official news'),
               OutlinedButton(
                 onPressed: () => act(() => open(newsUrl)),
-                child: const Text('Open official blog'),
+                child: const Tooltip(
+                  message: 'Open official blog',
+                  child: Icon(Icons.open_in_new),
+                ),
               ),
               FutureBuilder<List<NewsArticle>>(
                 future: bulletin ??= fetchNews(),
@@ -1939,9 +1647,7 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
                   if (s.hasError) {
                     return const Padding(
                       padding: EdgeInsets.all(20),
-                      child: Text(
-                        'News could not load. Your tracker still works offline. Use the official blog link above.',
-                      ),
+                      child: Text('News unavailable'),
                     );
                   }
                   return Column(
@@ -1956,10 +1662,7 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          subtitle: const Text(
-                            'supercell.com · Official announcement',
-                            style: TextStyle(fontSize: 10),
-                          ),
+
                           trailing: const Icon(Icons.open_in_new, size: 18),
                           onTap: () => act(() => open(a.url)),
                         ),
@@ -1997,9 +1700,7 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
-                      'Paste Export Data JSON from Clash settings. Matching player tags update the existing profile. Other tags create a new profile.',
-                    ),
+                    const Text('Paste Export Data JSON from Clash settings.'),
                     const SizedBox(height: 16),
                     TextField(
                       controller: name,
@@ -2035,7 +1736,10 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
+                child: const Tooltip(
+                  message: 'Cancel',
+                  child: Icon(Icons.close_rounded),
+                ),
               ),
               FilledButton(
                 onPressed: () async {
@@ -2056,7 +1760,7 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
                     }
                     await store.add(v);
                     if (context.mounted) Navigator.pop(context);
-                    message('Village saved on this device.');
+                    message('Imported');
                   } catch (e) {
                     update(
                       () => error = e.toString().replaceFirst(
@@ -2066,7 +1770,10 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
                     );
                   }
                 },
-                child: const Text('Import'),
+                child: const Tooltip(
+                  message: 'Import',
+                  child: Icon(Icons.file_download_outlined),
+                ),
               ),
             ],
           ),
@@ -2092,104 +1799,22 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(c, false),
-              child: const Text('Cancel'),
+              child: const Tooltip(
+                message: 'Cancel',
+                child: Icon(Icons.close_rounded),
+              ),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(c, true),
-              child: const Text('Continue'),
+              child: const Tooltip(
+                message: 'Continue',
+                child: Icon(Icons.check_rounded),
+              ),
             ),
           ],
         ),
       ) ??
       false;
-
-  Future<void> profiles() async {
-    await showModalBottomSheet<void>(
-      context: ui,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-          child: SizedBox(
-            height: MediaQuery.sizeOf(context).height * .65,
-            child: Column(
-              children: [
-                const Text(
-                  'Your villages',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 16),
-                Expanded(
-                  child: ListView(
-                    children: [
-                      for (final v in store.villages)
-                        ListTile(
-                          leading: const Icon(Icons.fort, color: forest),
-                          title: Text(v.name),
-                          subtitle: Text('${v.tag} · TH ${v.townHall}'),
-                          selected: v.tag == store.selected?.tag,
-                          onTap: () => act(() async {
-                            store.selectedTag = v.tag;
-                            await store.save();
-                            if (context.mounted) Navigator.pop(context);
-                          }),
-                          trailing: PopupMenuButton<String>(
-                            onSelected: (value) async {
-                              if (value == 'rename') {
-                                final name = await askText(
-                                  'Rename village',
-                                  'Nickname',
-                                  initial: v.name,
-                                );
-                                if (name?.trim().isNotEmpty == true) {
-                                  await act(() async {
-                                    v.name = name!.trim();
-                                    await store.save();
-                                  });
-                                }
-                              } else if (await confirmIn(
-                                context,
-                                'Remove ${v.name}?',
-                                'This removes the local profile. Export a backup first if you want to keep manual changes.',
-                              )) {
-                                await act(() async {
-                                  store.villages.remove(v);
-                                  await store.save();
-                                });
-                              }
-                              if (context.mounted) Navigator.pop(context);
-                            },
-                            itemBuilder: (_) => const [
-                              PopupMenuItem(
-                                value: 'rename',
-                                child: Text('Rename'),
-                              ),
-                              PopupMenuItem(
-                                value: 'delete',
-                                child: Text('Remove'),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                FilledButton.icon(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    importVillage();
-                  },
-                  icon: const Icon(Icons.add),
-                  label: const Text('Import another village'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 
   Future<String?> askText(
     String title,
@@ -2215,11 +1840,17 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: const Tooltip(
+              message: 'Cancel',
+              child: Icon(Icons.close_rounded),
+            ),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('Save'),
+            child: const Tooltip(
+              message: 'Save',
+              child: Icon(Icons.check_rounded),
+            ),
           ),
         ],
       ),
@@ -2254,20 +1885,24 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
       context: ui,
       builder: (context) => AlertDialog(
         title: const Text('Export backup'),
-        content: const Text(
-          'Keep this backup somewhere safe. It contains your village profiles and recorded upgrades. Import it on another device to transfer them.',
-        ),
+        content: const Text('All profiles and timers.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+            child: const Tooltip(
+              message: 'Close',
+              child: Icon(Icons.close_rounded),
+            ),
           ),
           TextButton(
             onPressed: () => act(() async {
               await Clipboard.setData(ClipboardData(text: text));
               message('Backup copied.');
             }),
-            child: const Text('Copy JSON'),
+            child: const Tooltip(
+              message: 'Copy JSON',
+              child: Icon(Icons.copy_rounded),
+            ),
           ),
           if (onAndroid)
             FilledButton(
@@ -2281,7 +1916,10 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
                   if (context.mounted) Navigator.pop(context);
                 }
               }),
-              child: const Text('Save file'),
+              child: const Tooltip(
+                message: 'Save file',
+                child: Icon(Icons.save_alt_rounded),
+              ),
             ),
         ],
       ),
@@ -2302,7 +1940,7 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  'Paste a COCTracker backup, or choose a saved JSON file. This replaces all local profiles and preferences.',
+                  'Restoring replaces all local profiles and preferences.',
                 ),
                 const SizedBox(height: 12),
                 TextField(
@@ -2312,14 +1950,14 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
                   decoration: const InputDecoration(labelText: 'Backup JSON'),
                 ),
                 if (onAndroid)
-                  TextButton.icon(
+                  IconButton(
+                    tooltip: 'Choose file',
                     onPressed: () => act(() async {
                       final result = await TrackerStore.channel
                           .invokeMethod<String>('readBackup');
                       if (result != null) text.text = result;
                     }),
                     icon: const Icon(Icons.folder_open),
-                    label: const Text('Choose file'),
                   ),
                 if (error != null) Text(error!),
               ],
@@ -2328,7 +1966,10 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+              child: const Tooltip(
+                message: 'Cancel',
+                child: Icon(Icons.close_rounded),
+              ),
             ),
             FilledButton(
               onPressed: () async {
@@ -2348,7 +1989,10 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
                   update(() => error = 'Invalid backup: $e');
                 }
               },
-              child: const Text('Restore'),
+              child: const Tooltip(
+                message: 'Restore',
+                child: Icon(Icons.restore_rounded),
+              ),
             ),
           ],
         ),
@@ -2369,12 +2013,18 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
       ),
       FilledButton(
         onPressed: exportBackup,
-        child: const Text('Export original data'),
+        child: const Tooltip(
+          message: 'Export original data',
+          child: Icon(Icons.download_outlined),
+        ),
       ),
       const SizedBox(height: 12),
       OutlinedButton(
         onPressed: restoreBackup,
-        child: const Text('Restore a valid backup'),
+        child: const Tooltip(
+          message: 'Restore a valid backup',
+          child: Icon(Icons.restore_rounded),
+        ),
       ),
     ],
   );
@@ -2384,18 +2034,24 @@ class _TrackerAppState extends State<TrackerApp> with WidgetsBindingObserver {
       title: const Text('Built for your village'),
       content: const SingleChildScrollView(
         child: Text(
-          'COCTracker is a free, unofficial fan app by @saimadhav10.\n\nThis material is unofficial and is not endorsed by Supercell. For more information see Supercell’s Fan Content Policy: supercell.com/en/fan-content-policy\n\nGame artwork belongs to Supercell. Official currency icons: Supercell Fan Kit. Catalogue and additional game artwork packaging: chiefpansancolt/clash-of-clans-data, MIT License (Christopher Pezza, 2026). Fonts: Space Grotesk and Plus Jakarta Sans, SIL Open Font License.\n\nProfiles are stored on your device. Network requests fetch the public game catalogue and official news; your village JSON is not uploaded. Android Usage Access is used locally for Clash reminders.\n\nUpgrade values are community-maintained base values. Boosts and remaining-work totals are labelled calculations. Army plans are generated planning suggestions using your imported troop levels and capacity; they are not performance statistics. Strategy guidance is app-authored. Verify current game values in Clash.',
+          'COCTracker is a free, unofficial fan app by @saimadhav10.\n\nThis material is unofficial and is not endorsed by Supercell. For more information see Supercell’s Fan Content Policy: supercell.com/en/fan-content-policy\n\nGame artwork belongs to Supercell. Official currency icons: Supercell Fan Kit. Catalogue and additional game artwork packaging: chiefpansancolt/clash-of-clans-data, MIT License (Christopher Pezza, 2026). Fonts: Space Grotesk and Plus Jakarta Sans, SIL Open Font License.\n\nProfiles are stored on your device. Network requests fetch the public game catalogue and official news; your village JSON is not uploaded. Android Usage Access is used locally for Clash reminders.\n\nUpgrade values are community-maintained base values. Gold Pass durations are estimates; imported finish times are preserved. Army compositions are sourced from Clash Armies and preserved without invented slots, levels or performance statistics. Recommendations use app planning rules. Verify current game values in Clash.',
         ),
       ),
       actions: [
         TextButton(
           onPressed: () =>
               showLicensePage(context: context, applicationName: 'COCTracker'),
-          child: const Text('Licenses'),
+          child: const Tooltip(
+            message: 'Licenses',
+            child: Icon(Icons.description_outlined),
+          ),
         ),
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Close'),
+          child: const Tooltip(
+            message: 'Close',
+            child: Icon(Icons.close_rounded),
+          ),
         ),
       ],
     ),

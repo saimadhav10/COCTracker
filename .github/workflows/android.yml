@@ -25,6 +25,7 @@ jobs:
       - run: dart format --output=none --set-exit-if-changed lib test
       - run: flutter analyze
       - run: flutter test
+      - run: python tool/audit_armies.py
       - run: flutter build apk --release --split-per-abi
       - run: ./gradlew :app:testReleaseUnitTest
         working-directory: android
