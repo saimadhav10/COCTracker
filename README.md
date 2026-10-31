@@ -55,25 +55,7 @@ Keep a backup before uninstalling or changing phones. Updates use the original s
 
 Profiles stay on your device. Network access fetches the public catalogue and official Supercell news; your village JSON is not uploaded. Crafting modules, supercharges, and special Town Hall weapon merges require fresh game imports.
 
-<details>
-<summary><strong>Build from source</strong></summary>
-
-Validated with Flutter 3.47.8, Dart 3.13.7, and Java 21.
-
-```sh
-flutter pub get
-dart format --output=none --set-exit-if-changed lib test
-flutter analyze
-flutter test
-python tool/audit_armies.py
-flutter build apk --release --split-per-abi
-```
-
-Android SDK platform 36 and Flutter's selected NDK are required. APKs are written to `build/app/outputs/flutter-apk/`. For signed builds, configure a private `android/key.properties` with `storeFile`, `storePassword`, `keyAlias`, and `keyPassword`. Keep signing files private and reuse the original release key. CI builds unsigned artifacts; install signed files from Releases.
-
 See [architecture](docs/ARCHITECTURE.md), [asset credits](THIRD_PARTY_NOTICES.md), and [icon provenance](docs/BRANDING.md).
-
-</details>
 
 ## Creator & credits
 
